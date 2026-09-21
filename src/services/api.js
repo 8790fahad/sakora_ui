@@ -1,0 +1,392 @@
+import axios from "axios";
+import toast from "react-hot-toast";
+
+// Base API URL
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:5100/api";
+
+// Create axios instance
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 30000, // 30 seconds
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+// Token management
+let authToken = null;
+
+export const setToken = (token) => {
+  authToken = token;
+  if (token) {
+    api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    localStorage.setItem("inventria_token", token);
+  } else {
+    delete api.defaults.headers.common["Authorization"];
+    localStorage.removeItem("inventria_token");
+  }
+};
+
+export const getToken = () => {
+  if (!authToken) {
+    authToken = localStorage.getItem("inventria_token");
+    if (authToken) {
+      api.defaults.headers.common["Authorization"] = `Bearer ${authToken}`;
+    }
+  }
+  return authToken;
+};
+
+export const removeToken = () => {
+  authToken = null;
+  delete api.defaults.headers.common["Authorization"];
+  localStorage.removeItem("inventria_token");
+  localStorage.removeItem("inventria_user");
+};
+
+// Initialize token from localStorage on startup
+getToken();
+
+// Request interceptor
+api.interceptors.request.use(
+  (config) => {
+    // Add timestamp to prevent caching
+    if (config.method === "get") {
+      config.params = {
+        ...config.params,
+        _t: Date.now(),
+      };
+    }
+
+    // Add correlation ID for tracking
+    config.headers["X-Request-ID"] =
+      Date.now().toString() + Math.random().toString(36).substr(2, 9);
+
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor
+api.interceptors.response.use(
+  (response) => {
+    // Return response.data directly so React Query gets the actual data
+    // This makes it easier to access: data.data.items instead of data.data.data.items
+    return response.data;
+  },
+  async (error) => {
+    const originalRequest = error.config;
+
+    // Handle network errors
+    if (!error.response) {
+      if (!navigator.onLine) {
+        toast.error("No internet connection. Changes will sync when online.");
+        return Promise.reject({
+          message: "Network error",
+          type: "NETWORK_ERROR",
+          offline: true,
+        });
+      } else {
+        toast.error("Network error. Please try again.");
+        return Promise.reject({
+          message: "Network error",
+          type: "NETWORK_ERROR",
+        });
+      }
+    }
+
+    const { status, data } = error.response;
+
+    // Handle authentication errors (skip login/register — those 401s are invalid credentials)
+    const isAuthEndpoint =
+      originalRequest.url?.includes("/auth/login") ||
+      originalRequest.url?.includes("/auth/register");
+
+    if (status === 401 && !originalRequest._retry && !isAuthEndpoint) {
+      originalRequest._retry = true;
+
+      // Clear token and redirect to login
+      removeToken();
+
+      // Dispatch logout action if store is available
+      if (window.__store__) {
+        window.__store__.dispatch({ type: "auth/clearAuth" });
+      }
+
+      toast.error("Session expired. Please log in again.");
+
+      // Redirect to login page
+      if (
+        window.location.pathname !== "/login" &&
+        window.location.pathname !== "/register"
+      ) {
+        window.location.href = "/login";
+      }
+
+      return Promise.reject({
+        message: "Session expired",
+        type: "AUTH_ERROR",
+        status,
+      });
+    }
+
+    // Handle other HTTP errors
+    let errorMessage = data?.message || getErrorMessage(status);
+
+    // Handle validation errors - combine multiple field errors into one message
+    if (status === 400 && data?.errors && Array.isArray(data.errors)) {
+      const validationMessages = data.errors
+        .map((err) => `${err.field}: ${err.message}`)
+        .join(", ");
+      errorMessage = validationMessages || errorMessage;
+    }
+
+    // Don't show toast for certain silent operations
+    const silentOperations = ["/auth/profile", "/dashboard/stats"];
+    const isSilentOperation = silentOperations.some((path) =>
+      originalRequest.url.includes(path)
+    );
+
+    if (!isSilentOperation) {
+      if (status >= 500) {
+        toast.error("Server error. Please try again later.");
+      } else if (status >= 400 && status < 500) {
+        // Only show one toast per error
+        toast.error(errorMessage, { id: originalRequest.url });
+      }
+    }
+
+    return Promise.reject({
+      message: errorMessage,
+      type: "HTTP_ERROR",
+      status,
+      data: data?.details || data?.errors || null,
+      response: error.response,
+    });
+  }
+);
+
+// Helper function to get user-friendly error messages
+const getErrorMessage = (status) => {
+  switch (status) {
+    case 400:
+      return "Invalid request. Please check your data.";
+    case 403:
+      return "You don't have permission to perform this action.";
+    case 404:
+      return "The requested resource was not found.";
+    case 409:
+      return "This resource already exists or conflicts with existing data.";
+    case 422:
+      return "Invalid data provided. Please check your inputs.";
+    case 429:
+      return "Too many requests. Please wait a moment.";
+    case 500:
+      return "Server error. Please try again later.";
+    case 502:
+      return "Server is temporarily unavailable.";
+    case 503:
+      return "Service temporarily unavailable.";
+    default:
+      return "An unexpected error occurred.";
+  }
+};
+
+// API methods
+const apiMethods = {
+  // Generic methods
+  get: (url, config = {}) => api.get(url, config),
+  post: (url, data = {}, config = {}) => api.post(url, data, config),
+  put: (url, data = {}, config = {}) => api.put(url, data, config),
+  patch: (url, data = {}, config = {}) => api.patch(url, data, config),
+  delete: (url, config = {}) => api.delete(url, config),
+
+  // Authentication
+  auth: {
+    login: (credentials) => api.post("/auth/login", credentials),
+    register: (userData) => api.post("/auth/register", userData),
+    logout: () => api.post("/auth/logout"),
+    profile: () => api.get("/auth/profile"),
+    updateProfile: (data) => api.put("/auth/profile", data),
+    changePassword: (data) => api.put("/auth/change-password", data),
+    sessions: () => api.get("/auth/sessions"),
+    revokeSession: (sessionId) => api.delete(`/auth/sessions/${sessionId}`),
+  },
+
+  // Business
+  business: {
+    profile: () => api.get("/business/profile"),
+    updateProfile: (data) => api.put("/business/profile", data),
+    branches: () => api.get("/business/branches"),
+    createBranch: (data) => api.post("/business/branches", data),
+    updateBranch: (id, data) => api.put(`/business/branches/${id}`, data),
+    deleteBranch: (id) => api.delete(`/business/branches/${id}`),
+    stats: () => api.get("/business/stats"),
+  },
+
+  // Products
+  products: {
+    list: (params = {}) => api.get("/products", { params }),
+    get: (id) => api.get(`/products/${id}`),
+    create: (data) => api.post("/products", data),
+    update: (id, data) => api.put(`/products/${id}`, data),
+    delete: (id) => api.delete(`/products/${id}`),
+    categories: () => api.get("/products/categories/list"),
+    createCategory: (data) => api.post("/products/categories", data),
+    updateCategory: (id, data) => api.put(`/products/categories/${id}`, data),
+    deleteCategory: (id) => api.delete(`/products/categories/${id}`),
+  },
+
+  // Inventory
+  inventory: {
+    list: (params = {}) => api.get("/inventory", { params }),
+    get: (id) => api.get(`/inventory/${id}`),
+    adjust: (id, data) => api.post(`/inventory/${id}/adjust`, data),
+    lowStock: () => api.get("/inventory/low-stock"),
+    valuation: () => api.get("/inventory/valuation"),
+  },
+
+  // Sales
+  sales: {
+    list: (params = {}) => api.get("/sales", { params }),
+    get: (id) => api.get(`/sales/${id}`),
+    create: (data) => api.post("/sales", data),
+    update: (id, data) => api.put(`/sales/${id}`, data),
+    delete: (id) => api.delete(`/sales/${id}`),
+    receipt: (id) => api.get(`/sales/${id}/receipt`),
+    stats: (params = {}) => api.get("/sales/stats", { params }),
+  },
+
+  // Purchases
+  purchases: {
+    list: (params = {}) => api.get("/purchases", { params }),
+    get: (id) => api.get(`/purchases/${id}`),
+    create: (data) => api.post("/purchases", data),
+    update: (id, data) => api.put(`/purchases/${id}`, data),
+    delete: (id) => api.delete(`/purchases/${id}`),
+    stats: (params = {}) => api.get("/purchases/stats", { params }),
+  },
+
+  // Expenses
+  expenses: {
+    list: (params = {}) => api.get("/expenses", { params }),
+    get: (id) => api.get(`/expenses/${id}`),
+    create: (data) => api.post("/expenses", data),
+    update: (id, data) => api.put(`/expenses/${id}`, data),
+    delete: (id) => api.delete(`/expenses/${id}`),
+    categories: () => api.get("/expenses/categories"),
+    createCategory: (data) => api.post("/expenses/categories", data),
+    updateCategory: (id, data) => api.put(`/expenses/categories/${id}`, data),
+    deleteCategory: (id) => api.delete(`/expenses/categories/${id}`),
+    stats: (params = {}) => api.get("/expenses/stats", { params }),
+  },
+
+  // Customers
+  customers: {
+    list: (params = {}) => api.get("/customers", { params }),
+    get: (id) => api.get(`/customers/${id}`),
+    create: (data) => api.post("/customers", data),
+    update: (id, data) => api.put(`/customers/${id}`, data),
+    delete: (id) => api.delete(`/customers/${id}`),
+    transactions: (id, params = {}) =>
+      api.get(`/customers/${id}/transactions`, { params }),
+  },
+
+  // Suppliers
+  suppliers: {
+    list: (params = {}) => api.get("/suppliers", { params }),
+    get: (id) => api.get(`/suppliers/${id}`),
+    create: (data) => api.post("/suppliers", data),
+    update: (id, data) => api.put(`/suppliers/${id}`, data),
+    delete: (id) => api.delete(`/suppliers/${id}`),
+    transactions: (id, params = {}) =>
+      api.get(`/suppliers/${id}/transactions`, { params }),
+  },
+
+  // Cash Management
+  cash: {
+    balance: () => api.get("/cash/balance"),
+    transactions: (params = {}) => api.get("/cash/transactions", { params }),
+    recordManual: (data) => api.post("/cash/manual", data),
+    setOpeningBalance: (data) => api.post("/cash/opening-balance", data),
+    summary: (params = {}) => api.get("/cash/summary", { params }),
+    flow: (params = {}) => api.get("/cash/flow", { params }),
+  },
+
+  // Reports
+  reports: {
+    sales: (params = {}) => api.get("/reports/sales", { params }),
+    purchases: (params = {}) => api.get("/reports/purchases", { params }),
+    expenses: (params = {}) => api.get("/reports/expenses", { params }),
+    "profit-loss": (params = {}) => api.get("/reports/profit-loss", { params }),
+    inventory: (params = {}) => api.get("/reports/inventory", { params }),
+  },
+
+  // Settings
+  settings: {
+    get: () => api.get("/settings"),
+    updateBusiness: (data) => api.put("/settings/business", data),
+    updatePreferences: (data) => api.put("/settings/preferences", data),
+    exportData: (type, params = {}) =>
+      api.get(`/settings/export/${type}`, { params }),
+    backup: () => api.post("/settings/backup"),
+    systemInfo: () => api.get("/settings/system"),
+    reset: (data) => api.post("/settings/reset", data),
+  },
+
+  // Dashboard
+  dashboard: {
+    stats: () => api.get("/dashboard/stats"),
+    charts: (params = {}) => api.get("/dashboard/charts", { params }),
+    recent: () => api.get("/dashboard/recent"),
+    alerts: () => api.get("/dashboard/alerts"),
+  },
+
+  // Settings
+  settings: {
+    get: () => api.get("/settings"),
+    update: (data) => api.put("/settings", data),
+    export: (type) => api.get(`/settings/export/${type}`),
+    import: (data) => api.post("/settings/import", data),
+    backup: () => api.get("/settings/backup"),
+    restore: (data) => api.post("/settings/restore", data),
+  },
+
+  // File uploads
+  upload: {
+    single: (file, type = "general") => {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", type);
+
+      return api.post("/upload", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+    },
+    multiple: (files, type = "general") => {
+      const formData = new FormData();
+      files.forEach((file, index) => {
+        formData.append(`files[${index}]`, file);
+      });
+      formData.append("type", type);
+
+      return api.post("/upload/multiple", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+    },
+  },
+};
+
+// Export token management functions
+apiMethods.setToken = setToken;
+apiMethods.getToken = getToken;
+apiMethods.removeToken = removeToken;
+
+export default apiMethods;
