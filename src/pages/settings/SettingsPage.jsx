@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "react-query";
 import { toast } from "react-hot-toast";
+import { Link } from "react-router-dom";
 import api from "../../services/api";
 
 const SettingsPage = () => {
@@ -327,18 +328,25 @@ const SettingsPage = () => {
                       id="taxEnabled"
                       className="form-checkbox"
                       checked={settings.business?.taxEnabled || false}
-                      onChange={(e) =>
-                        handleBusinessSettingChange(
-                          "taxEnabled",
-                          e.target.checked
-                        )
-                      }
+                      onChange={(e) => {
+                        const enabled = e.target.checked;
+                        updateBusinessMutation.mutate({
+                          taxEnabled: enabled,
+                          ...(enabled
+                            ? {
+                                taxName: settings.business?.taxName || "VAT",
+                                taxRate:
+                                  parseFloat(settings.business?.taxRate) || 7.5,
+                              }
+                            : {}),
+                        });
+                      }}
                     />
                     <label
                       htmlFor="taxEnabled"
                       className="text-sm font-medium text-gray-700"
                     >
-                      Enable Tax Calculation
+                      Enable VAT
                     </label>
                   </div>
                 </div>
@@ -347,7 +355,7 @@ const SettingsPage = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 pt-6 border-t">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Tax Name
+                        Tax name
                       </label>
                       <input
                         type="text"
@@ -360,7 +368,7 @@ const SettingsPage = () => {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Tax Rate (%)
+                        Rate (%)
                       </label>
                       <input
                         type="number"
@@ -376,6 +384,32 @@ const SettingsPage = () => {
                           )
                         }
                       />
+                      <p className="mt-1 text-xs text-gray-500">
+                        Nigeria VAT is 7.5%
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        TIN
+                      </label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={settings.business?.taxTin || ""}
+                        placeholder="Business TIN"
+                        onChange={(e) =>
+                          handleBusinessSettingChange("taxTin", e.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="md:col-span-2 rounded-lg bg-teal-50 p-4 text-sm text-teal-800">
+                      Sales and paid orders collect <strong>output VAT</strong>.
+                      Purchases claim <strong>input VAT</strong>. Payable is
+                      output minus input. After you record a VAT payment, the
+                      balance is <strong>net</strong>.
+                      <Link to="/vat" className="ml-1 font-semibold underline">
+                        Open VAT ledger
+                      </Link>
                     </div>
                   </div>
                 )}

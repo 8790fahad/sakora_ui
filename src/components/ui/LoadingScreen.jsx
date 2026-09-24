@@ -14,7 +14,7 @@ const LoadingScreen = ({ message = 'Loading...' }) => {
 
         {/* Loading text */}
         <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
-          Inventria Mobile
+          sakora Mobile
         </h2>
         <p className="text-gray-600 dark:text-gray-400 mb-8">
           Smart Inventory Management

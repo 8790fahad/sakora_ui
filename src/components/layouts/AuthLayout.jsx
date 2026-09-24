@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import { Smartphone, Shield, Zap, BarChart3 } from "lucide-react";
 
 const AuthLayout = ({ children }) => {
@@ -14,20 +15,18 @@ const AuthLayout = ({ children }) => {
               </div>
             </div>
             <div className="ml-4">
-              <h1 className="text-3xl font-bold">Inventria Mobile</h1>
-              <p className="text-primary-100">Smart Inventory Management</p>
+              <h1 className="text-3xl font-bold">Sakora</h1>
+              <p className="text-primary-100">Website, WhatsApp sales & inventory</p>
             </div>
           </div>
 
           <h2 className="text-4xl font-bold mb-6 leading-tight">
-            Manage your business
-            <span className="text-primary-200"> on the go</span>
+            Run your business
+            <span className="text-primary-200"> from your phone</span>
           </h2>
 
           <p className="text-xl text-primary-100 mb-12 leading-relaxed">
-            Simple, fast, and intuitive inventory management designed for small
-            businesses. Track sales, manage stock, and grow your business from
-            anywhere.
+            Get a shop link, sell on WhatsApp, record sales, collect payments with Squad, and keep stock in one app.
           </p>
 
           <div className="space-y-6">
@@ -36,9 +35,9 @@ const AuthLayout = ({ children }) => {
                 <Shield className="w-6 h-6 text-primary-200 mt-1" />
               </div>
               <div className="ml-4">
-                <h3 className="font-semibold mb-1">Secure & Reliable</h3>
+                <h3 className="font-semibold mb-1">WhatsApp selling</h3>
                 <p className="text-primary-100 text-sm">
-                  Your business data is protected with enterprise-grade security
+                  Share products and invoices with customers in one tap
                 </p>
               </div>
             </div>
@@ -48,9 +47,9 @@ const AuthLayout = ({ children }) => {
                 <Zap className="w-6 h-6 text-primary-200 mt-1" />
               </div>
               <div className="ml-4">
-                <h3 className="font-semibold mb-1">Lightning Fast</h3>
+                <h3 className="font-semibold mb-1">Online shop</h3>
                 <p className="text-primary-100 text-sm">
-                  Optimized for speed with offline capability and instant sync
+                  Get a shop link customers can browse and pay on
                 </p>
               </div>
             </div>
@@ -60,10 +59,9 @@ const AuthLayout = ({ children }) => {
                 <BarChart3 className="w-6 h-6 text-primary-200 mt-1" />
               </div>
               <div className="ml-4">
-                <h3 className="font-semibold mb-1">Smart Analytics</h3>
+                <h3 className="font-semibold mb-1">Stock & sales</h3>
                 <p className="text-primary-100 text-sm">
-                  Get insights into your business with detailed reports and
-                  charts
+                  Record sales, track inventory, and see how the business is doing
                 </p>
               </div>
             </div>
@@ -82,7 +80,7 @@ const AuthLayout = ({ children }) => {
               </div>
               <div className="ml-3">
                 <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                  Inventria Mobile
+                  sakora Mobile
                 </h1>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   Smart Inventory Management
@@ -97,8 +95,21 @@ const AuthLayout = ({ children }) => {
           </div>
 
           {/* Footer */}
-          <div className="mt-8 text-center text-sm text-gray-600 dark:text-gray-400">
+          <div className="mt-8 text-center text-sm text-gray-600 dark:text-gray-400 space-y-2">
             <p>Made with ❤️ for small businesses</p>
+            <p className="text-xs">
+              <Link to="/legal/terms" className="hover:text-primary-600">
+                Terms of Use
+              </Link>
+              {" · "}
+              <Link to="/legal/merchant-terms" className="hover:text-primary-600">
+                Merchant Terms
+              </Link>
+              {" · "}
+              <Link to="/legal/privacy" className="hover:text-primary-600">
+                Privacy Policy
+              </Link>
+            </p>
           </div>
         </div>
       </div>

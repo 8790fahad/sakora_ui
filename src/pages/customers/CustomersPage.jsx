@@ -21,6 +21,15 @@ import { useQuery, useMutation, useQueryClient } from "react-query";
 import toast from "react-hot-toast";
 import api from "../../services/api";
 
+const PARTY_TYPES = [
+  { value: "individual", label: "Individual" },
+  { value: "company", label: "Company" },
+  { value: "government", label: "Government" },
+];
+
+const typeLabel = (value) =>
+  PARTY_TYPES.find((item) => item.value === value)?.label || "Individual";
+
 const CustomersPage = () => {
   const [search, setSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -35,6 +44,8 @@ const CustomersPage = () => {
     email: "",
     address: "",
     notes: "",
+    tin: "",
+    customerType: "individual",
   });
 
   const queryClient = useQueryClient();
@@ -122,6 +133,8 @@ const CustomersPage = () => {
       email: "",
       address: "",
       notes: "",
+      tin: "",
+      customerType: "individual",
     });
   };
 
@@ -133,6 +146,8 @@ const CustomersPage = () => {
       email: customer.email || "",
       address: customer.address || "",
       notes: customer.notes || "",
+      tin: customer.tin || "",
+      customerType: customer.customerType || "individual",
     });
     setShowFormModal(true);
   };
@@ -251,7 +266,8 @@ const CustomersPage = () => {
                       {customer.name}
                     </h3>
                     <p className="text-sm text-gray-500">
-                      Customer ID: #{customer.id.slice(-6)}
+                      {typeLabel(customer.customerType)}
+                      {customer.tin ? ` · TIN ${customer.tin}` : ""}
                     </p>
                   </div>
                 </div>
@@ -342,7 +358,7 @@ const CustomersPage = () => {
       {/* Customer Form Modal */}
       {showFormModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-600">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 {editingCustomer ? "Edit Customer" : "Add New Customer"}
@@ -371,6 +387,41 @@ const CustomersPage = () => {
                   value={customerForm.name}
                   onChange={(e) =>
                     setCustomerForm({ ...customerForm, name: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Type
+                </label>
+                <select
+                  className="form-input"
+                  value={customerForm.customerType}
+                  onChange={(e) =>
+                    setCustomerForm({
+                      ...customerForm,
+                      customerType: e.target.value,
+                    })
+                  }
+                >
+                  {PARTY_TYPES.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  TIN
+                </label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Tax identification number"
+                  value={customerForm.tin}
+                  onChange={(e) =>
+                    setCustomerForm({ ...customerForm, tin: e.target.value })
                   }
                 />
               </div>
@@ -531,6 +582,14 @@ const CustomersPage = () => {
                           <div className="flex items-start">
                             <MapPin className="w-5 h-5 text-gray-400 mr-3 mt-0.5" />
                             <span>{customerDetails.address}</span>
+                          </div>
+                        )}
+                        <div className="text-sm text-gray-600">
+                          Type: {typeLabel(customerDetails.customerType)}
+                        </div>
+                        {customerDetails.tin && (
+                          <div className="text-sm text-gray-600">
+                            TIN: {customerDetails.tin}
                           </div>
                         )}
                       </div>

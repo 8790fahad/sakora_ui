@@ -21,6 +21,15 @@ import { useQuery, useMutation, useQueryClient } from "react-query";
 import toast from "react-hot-toast";
 import api from "../../services/api";
 
+const PARTY_TYPES = [
+  { value: "individual", label: "Individual" },
+  { value: "company", label: "Company" },
+  { value: "government", label: "Government" },
+];
+
+const typeLabel = (value) =>
+  PARTY_TYPES.find((item) => item.value === value)?.label || "Individual";
+
 const SuppliersPage = () => {
   const [search, setSearch] = useState("");
   const [selectedSupplier, setSelectedSupplier] = useState(null);
@@ -35,6 +44,8 @@ const SuppliersPage = () => {
     email: "",
     address: "",
     notes: "",
+    tin: "",
+    supplierType: "individual",
   });
 
   const queryClient = useQueryClient();
@@ -132,6 +143,8 @@ const SuppliersPage = () => {
       email: "",
       address: "",
       notes: "",
+      tin: "",
+      supplierType: "individual",
     });
   };
 
@@ -143,6 +156,8 @@ const SuppliersPage = () => {
       email: supplier.email || "",
       address: supplier.address || "",
       notes: supplier.notes || "",
+      tin: supplier.tin || "",
+      supplierType: supplier.supplierType || "individual",
     });
     setShowFormModal(true);
   };
@@ -277,7 +292,8 @@ const SuppliersPage = () => {
                       {supplier.name}
                     </h3>
                     <p className="text-sm text-gray-500">
-                      Supplier ID: #{supplier.id.slice(-6)}
+                      {typeLabel(supplier.supplierType)}
+                      {supplier.tin ? ` · TIN ${supplier.tin}` : ""}
                     </p>
                   </div>
                 </div>
@@ -368,7 +384,7 @@ const SuppliersPage = () => {
       {/* Supplier Form Modal */}
       {showFormModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-600">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 {editingSupplier ? "Edit Supplier" : "Add New Supplier"}
@@ -397,6 +413,41 @@ const SuppliersPage = () => {
                   value={supplierForm.name}
                   onChange={(e) =>
                     setSupplierForm({ ...supplierForm, name: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Type
+                </label>
+                <select
+                  className="form-input"
+                  value={supplierForm.supplierType}
+                  onChange={(e) =>
+                    setSupplierForm({
+                      ...supplierForm,
+                      supplierType: e.target.value,
+                    })
+                  }
+                >
+                  {PARTY_TYPES.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  TIN
+                </label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Tax identification number"
+                  value={supplierForm.tin}
+                  onChange={(e) =>
+                    setSupplierForm({ ...supplierForm, tin: e.target.value })
                   }
                 />
               </div>
@@ -557,6 +608,14 @@ const SuppliersPage = () => {
                           <div className="flex items-start">
                             <MapPin className="w-5 h-5 text-gray-400 mr-3 mt-0.5" />
                             <span>{supplierDetails.address}</span>
+                          </div>
+                        )}
+                        <div className="text-sm text-gray-600">
+                          Type: {typeLabel(supplierDetails.supplierType)}
+                        </div>
+                        {supplierDetails.tin && (
+                          <div className="text-sm text-gray-600">
+                            TIN: {supplierDetails.tin}
                           </div>
                         )}
                       </div>

@@ -39,6 +39,13 @@ const SalesPage = () => {
 
   const queryClient = useQueryClient();
 
+  const { data: settingsData } = useQuery("settings", api.settings.get, {
+    refetchOnWindowFocus: false,
+  });
+  const vatEnabled = Boolean(settingsData?.data?.business?.taxEnabled);
+  const vatRate = parseFloat(settingsData?.data?.business?.taxRate || 0);
+  const vatName = settingsData?.data?.business?.taxName || "VAT";
+
   // Fetch products for POS
   const { data: productsData, isLoading: productsLoading } = useQuery(
     ["products", search],
@@ -116,7 +123,8 @@ const SalesPage = () => {
     (sum, item) => sum + item.quantity * item.price,
     0
   );
-  const finalTotal = cartTotal - (paymentData.discount || 0);
+  const taxAmount = vatEnabled ? (cartTotal * vatRate) / 100 : 0;
+  const finalTotal = cartTotal + taxAmount - (paymentData.discount || 0);
   const change = parseFloat(paymentData.amountPaid || 0) - finalTotal;
 
   // Add product to cart
@@ -208,6 +216,7 @@ const SalesPage = () => {
       paymentMethod: paymentData.method,
       paidAmount: parseFloat(paymentData.amountPaid),
       discountAmount: parseFloat(paymentData.discount || 0),
+      taxRate: vatEnabled ? vatRate : 0,
       notes: paymentData.notes,
       customerId: selectedCustomer?.id,
       customerName: selectedCustomer?.name,
@@ -479,6 +488,14 @@ const SalesPage = () => {
                     <span>Subtotal:</span>
                     <span>{formatCurrency(cartTotal)}</span>
                   </div>
+                  {vatEnabled && taxAmount > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span>
+                        {vatName} ({vatRate}%):
+                      </span>
+                      <span>{formatCurrency(taxAmount)}</span>
+                    </div>
+                  )}
                   {paymentData.discount > 0 && (
                     <div className="flex justify-between text-sm text-green-600">
                       <span>Discount:</span>
@@ -493,7 +510,13 @@ const SalesPage = () => {
 
                 {/* Checkout Button */}
                 <button
-                  onClick={() => setShowPaymentModal(true)}
+                  onClick={() => {
+                    setPaymentData({
+                      ...paymentData,
+                      amountPaid: finalTotal.toFixed(2),
+                    });
+                    setShowPaymentModal(true);
+                  }}
                   className="btn btn-success w-full mobile-btn"
                 >
                   <CreditCard className="w-4 h-4 mr-2" />
@@ -602,7 +625,19 @@ const SalesPage = () => {
 
               <div className="space-y-4">
                 {/* Total */}
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Subtotal</span>
+                    <span>{formatCurrency(cartTotal)}</span>
+                  </div>
+                  {vatEnabled && (
+                    <div className="flex justify-between text-sm">
+                      <span>
+                        {vatName} ({vatRate}%)
+                      </span>
+                      <span>{formatCurrency(taxAmount)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center text-lg font-bold">
                     <span>Total Amount:</span>
                     <span>{formatCurrency(finalTotal)}</span>

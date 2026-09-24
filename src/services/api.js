@@ -21,16 +21,16 @@ export const setToken = (token) => {
   authToken = token;
   if (token) {
     api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-    localStorage.setItem("inventria_token", token);
+    localStorage.setItem("sakora_token", token);
   } else {
     delete api.defaults.headers.common["Authorization"];
-    localStorage.removeItem("inventria_token");
+    localStorage.removeItem("sakora_token");
   }
 };
 
 export const getToken = () => {
   if (!authToken) {
-    authToken = localStorage.getItem("inventria_token");
+    authToken = localStorage.getItem("sakora_token");
     if (authToken) {
       api.defaults.headers.common["Authorization"] = `Bearer ${authToken}`;
     }
@@ -41,8 +41,8 @@ export const getToken = () => {
 export const removeToken = () => {
   authToken = null;
   delete api.defaults.headers.common["Authorization"];
-  localStorage.removeItem("inventria_token");
-  localStorage.removeItem("inventria_user");
+  localStorage.removeItem("sakora_token");
+  localStorage.removeItem("sakora_user");
 };
 
 // Initialize token from localStorage on startup
@@ -104,8 +104,16 @@ api.interceptors.response.use(
     const isAuthEndpoint =
       originalRequest.url?.includes("/auth/login") ||
       originalRequest.url?.includes("/auth/register");
+    const isPublicStorefront =
+      /\/storefront\/(?!settings)/.test(originalRequest.url || "") ||
+      window.location.pathname.startsWith("/shop");
 
-    if (status === 401 && !originalRequest._retry && !isAuthEndpoint) {
+    if (
+      status === 401 &&
+      !originalRequest._retry &&
+      !isAuthEndpoint &&
+      !isPublicStorefront
+    ) {
       originalRequest._retry = true;
 
       // Clear token and redirect to login
@@ -337,6 +345,11 @@ const apiMethods = {
     reset: (data) => api.post("/settings/reset", data),
   },
 
+  vat: {
+    summary: (params = {}) => api.get("/vat/summary", { params }),
+    pay: (data) => api.post("/vat/payments", data),
+  },
+
   // Dashboard
   dashboard: {
     stats: () => api.get("/dashboard/stats"),
@@ -345,14 +358,43 @@ const apiMethods = {
     alerts: () => api.get("/dashboard/alerts"),
   },
 
-  // Settings
-  settings: {
-    get: () => api.get("/settings"),
-    update: (data) => api.put("/settings", data),
-    export: (type) => api.get(`/settings/export/${type}`),
-    import: (data) => api.post("/settings/import", data),
-    backup: () => api.get("/settings/backup"),
-    restore: (data) => api.post("/settings/restore", data),
+  storefront: {
+    get: (slug) => api.get(`/storefront/${slug}`),
+    checkout: (slug, data) => api.post(`/storefront/${slug}/checkout`, data),
+    order: (slug, orderNumber) =>
+      api.get(`/storefront/${slug}/orders/${orderNumber}`),
+    verify: (slug, orderNumber, data = {}) =>
+      api.post(`/storefront/${slug}/orders/${orderNumber}/verify`, data),
+    settings: () => api.get("/storefront/settings"),
+    updateSettings: (data) => api.put("/storefront/settings", data),
+  },
+
+  orders: {
+    list: (params = {}) => api.get("/orders", { params }),
+    get: (id) => api.get(`/orders/${id}`),
+    create: (data) => api.post("/orders", data),
+    updateStatus: (id, status) => api.patch(`/orders/${id}/status`, { status }),
+  },
+
+  subscriptions: {
+    plans: () => api.get("/subscriptions/plans"),
+    checkout: (plan, interval = "month") =>
+      api.post("/subscriptions/checkout", { plan, interval }),
+    verify: (data) => api.post("/subscriptions/verify", data),
+    cancel: () => api.post("/subscriptions/cancel"),
+  },
+
+  notifications: {
+    list: (params = {}) => api.get("/notifications", { params }),
+    markRead: (id) => api.patch(`/notifications/${id}/read`),
+    markAllRead: () => api.patch("/notifications/read-all"),
+  },
+
+  users: {
+    list: () => api.get("/users"),
+    permissions: () => api.get("/users/permissions"),
+    create: (data) => api.post("/users", data),
+    update: (id, data) => api.put(`/users/${id}`, data),
   },
 
   // File uploads

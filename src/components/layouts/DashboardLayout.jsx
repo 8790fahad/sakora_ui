@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -21,55 +21,81 @@ import {
   MoreHorizontal,
   PanelLeftClose,
   PanelLeft,
+  ClipboardList,
+  Store,
+  CreditCard,
+  Shield,
+  Percent,
 } from "lucide-react";
 
 import { selectUser, logoutUser } from "../../store/slices/authSlice";
-import { selectNotifications } from "../../store/slices/uiSlice";
+import api from "../../services/api";
 
 const DashboardLayout = ({ children }) => {
   const dispatch = useDispatch();
   const location = useLocation();
   const navigate = useNavigate();
   const user = useSelector(selectUser);
-  const notifications = useSelector(selectNotifications);
+  const can = (permission) =>
+    user?.role === "owner" || (user?.permissions || []).includes(permission);
 
   const [showMore, setShowMore] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [remoteNotes, setRemoteNotes] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  const unreadNotifications = notifications?.filter((n) => !n.read).length || 0;
+  const loadNotifications = async () => {
+    try {
+      const response = await api.notifications.list({ limit: 20 });
+      setRemoteNotes(response.data.items || []);
+      setUnreadCount(response.data.unreadCount || 0);
+    } catch (error) {
+      // ignore if the user cannot view notifications
+    }
+  };
 
-  // All navigation items
+  useEffect(() => {
+    loadNotifications();
+    const timer = setInterval(loadNotifications, 20000);
+    return () => clearInterval(timer);
+  }, []);
+
   const allNavItems = [
-    { name: "Home", href: "/dashboard", icon: Home, color: "#007AFF" },
-    { name: "Products", href: "/products", icon: Package, color: "#5856D6" },
-    { name: "Sales", href: "/sales", icon: ShoppingCart, color: "#34C759" },
-    { name: "Cash", href: "/cash", icon: Wallet, color: "#007AFF" },
-    {
-      name: "Purchases",
-      href: "/purchases",
-      icon: TrendingUp,
-      color: "#AF52DE",
-    },
-    { name: "Expenses", href: "/expenses", icon: Receipt, color: "#FF9500" },
-    { name: "Customers", href: "/customers", icon: Users, color: "#5AC8FA" },
-    { name: "Suppliers", href: "/suppliers", icon: Truck, color: "#FF3B30" },
-    { name: "Reports", href: "/reports", icon: BarChart3, color: "#34C759" },
-    { name: "Settings", href: "/settings", icon: Settings, color: "#8E8E93" },
-  ];
+    { name: "Home", href: "/dashboard", icon: Home, color: "#007AFF", permission: "dashboard.view" },
+    { name: "Products", href: "/products", icon: Package, color: "#5856D6", permission: "products.view" },
+    { name: "Sales", href: "/sales", icon: ShoppingCart, color: "#34C759", permission: "sales.view" },
+    { name: "Orders", href: "/orders", icon: ClipboardList, color: "#FF9500", permission: "orders.view" },
+    { name: "Storefront", href: "/storefront", icon: Store, color: "#5AC8FA", permission: "storefront.manage" },
+    { name: "Invoices", href: "/invoices", icon: Receipt, color: "#FF9500", permission: "orders.manage" },
+    { name: "Cash", href: "/cash", icon: Wallet, color: "#007AFF", permission: "cash.view" },
+    { name: "Purchases", href: "/purchases", icon: TrendingUp, color: "#AF52DE", permission: "purchases.view" },
+    { name: "Expenses", href: "/expenses", icon: Receipt, color: "#FF9500", permission: "expenses.view" },
+    { name: "Customers", href: "/customers", icon: Users, color: "#5AC8FA", permission: "customers.view" },
+    { name: "Suppliers", href: "/suppliers", icon: Truck, color: "#FF3B30", permission: "suppliers.view" },
+    { name: "Reports", href: "/reports", icon: BarChart3, color: "#34C759", permission: "reports.view" },
+    { name: "VAT", href: "/vat", icon: Percent, color: "#0D9488", permission: "reports.view" },
+    { name: "Team", href: "/team", icon: Shield, color: "#5856D6", permission: "team.view" },
+    { name: "Billing", href: "/billing", icon: CreditCard, color: "#34C759", permission: "billing.manage" },
+    { name: "Settings", href: "/settings", icon: Settings, color: "#8E8E93", permission: "settings.view" },
+  ].filter((item) => can(item.permission));
+
+  const unreadNotifications = unreadCount;
 
   // Mobile tab bar items (5 items for iOS standard)
   const tabBarItems = [
     { name: "Home", href: "/dashboard", icon: Home },
     { name: "Products", href: "/products", icon: Package },
+    { name: "Orders", href: "/orders", icon: ClipboardList },
     { name: "Sales", href: "/sales", icon: ShoppingCart },
-    { name: "Cash", href: "/cash", icon: Wallet },
     { name: "More", href: "#more", icon: MoreHorizontal, isMore: true },
   ];
 
-  // More menu items (for mobile sheet)
-  const moreMenuItems = allNavItems.slice(4);
+  const moreMenuItems = allNavItems.filter(
+    (item) => !["/dashboard", "/products", "/orders", "/sales"].includes(item.href)
+  );
 
   const handleLogout = () => {
     dispatch(logoutUser());
@@ -85,7 +111,7 @@ const DashboardLayout = ({ children }) => {
     const item = allNavItems.find(
       (i) => i.href === path || path.startsWith(i.href)
     );
-    return item?.name || "Inventria";
+    return item?.name || "sakora";
   };
 
   return (
@@ -113,7 +139,7 @@ const DashboardLayout = ({ children }) => {
                 <Package className="w-4 h-4 text-white" />
               </div>
               <span className="ml-3 text-[17px] font-semibold text-[var(--ios-text-primary)]">
-                Inventria
+                sakora
               </span>
             </>
           )}
@@ -278,7 +304,10 @@ const DashboardLayout = ({ children }) => {
               >
                 <Search className="w-5 h-5" />
               </button>
-              <button className="p-2.5 rounded-full text-[var(--ios-blue)] hover:bg-[var(--ios-blue)]/10 transition-colors relative">
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="p-2.5 rounded-full text-[var(--ios-blue)] hover:bg-[var(--ios-blue)]/10 transition-colors relative"
+              >
                 <Bell className="w-5 h-5" />
                 {unreadNotifications > 0 && (
                   <span className="ios-badge absolute -top-0.5 -right-0.5 min-w-[18px]">
@@ -310,6 +339,44 @@ const DashboardLayout = ({ children }) => {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   autoFocus
                 />
+              </div>
+            </div>
+          )}
+          {showNotifications && (
+            <div className="absolute right-4 top-16 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-xl border z-50 overflow-hidden">
+              <div className="px-4 py-3 flex items-center justify-between border-b">
+                <p className="font-semibold">Notifications</p>
+                <button
+                  className="text-xs text-blue-600"
+                  onClick={async () => {
+                    await api.notifications.markAllRead();
+                    loadNotifications();
+                  }}
+                >
+                  Mark all read
+                </button>
+              </div>
+              <div className="max-h-80 overflow-y-auto">
+                {remoteNotes.map((note) => (
+                  <button
+                    key={note.id}
+                    className={`w-full text-left px-4 py-3 border-b ${
+                      note.isRead ? "bg-white" : "bg-blue-50"
+                    }`}
+                    onClick={async () => {
+                      await api.notifications.markRead(note.id);
+                      if (note.actionUrl) navigate(note.actionUrl);
+                      setShowNotifications(false);
+                      loadNotifications();
+                    }}
+                  >
+                    <p className="text-sm font-medium">{note.title}</p>
+                    <p className="text-xs text-slate-500">{note.message}</p>
+                  </button>
+                ))}
+                {!remoteNotes.length && (
+                  <p className="p-4 text-sm text-slate-500">No notifications yet.</p>
+                )}
               </div>
             </div>
           )}

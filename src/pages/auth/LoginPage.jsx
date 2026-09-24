@@ -57,7 +57,7 @@ const LoginPage = () => {
           Welcome back
         </h2>
         <p className="mt-2 text-gray-600 dark:text-gray-400">
-          Sign in to your account to continue
+          Sign in to sell, record sales, and share your shop
         </p>
       </div>
 
@@ -189,7 +189,7 @@ const LoginPage = () => {
           Demo Account (for testing):
         </p>
         <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
-          <div>Email: demo@inventria.com</div>
+          <div>Email: demo@sakora.com</div>
           <div>Password: demo123</div>
         </div>
       </div>

@@ -8,11 +8,13 @@ import {
   Trash2,
   X,
   Loader2,
+  Share2,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "react-query";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import api from "../../services/api";
+import { productUrl, shareProductText, whatsappLink } from "../../utils/share";
 
 const ProductsPage = () => {
   const queryClient = useQueryClient();
@@ -39,6 +41,7 @@ const ProductsPage = () => {
       lowStockThreshold: 10,
       initialStock: 0,
       description: "",
+      isOnline: true,
     },
   });
 
@@ -71,8 +74,25 @@ const ProductsPage = () => {
     { refetchOnWindowFocus: false }
   );
 
+  const { data: shopData } = useQuery("storefront-settings", api.storefront.settings, {
+    refetchOnWindowFocus: false,
+  });
+
   const products = productsData?.data?.items || [];
   const categories = categoriesData?.data?.categories || [];
+  const shop = shopData?.data || {};
+  const shopSlug = shop.slug;
+
+  const shareProduct = async (event, product) => {
+    event.stopPropagation();
+    if (!shopSlug) {
+      toast.error("Turn on your shop first");
+      return;
+    }
+    const url = productUrl(shopSlug, product.id);
+    const text = shareProductText(shop.name || shopSlug, product, url);
+    window.open(whatsappLink("", text), "_blank");
+  };
 
   // Create product mutation
   const createProductMutation = useMutation(
@@ -132,7 +152,7 @@ const ProductsPage = () => {
       unit: "piece",
       lowStockThreshold: 10,
       initialStock: 0,
-      description: "",
+      isOnline: true,
     });
   };
 
@@ -147,7 +167,7 @@ const ProductsPage = () => {
       unit: "piece",
       lowStockThreshold: 10,
       initialStock: 0,
-      description: "",
+      isOnline: true,
     });
     setShowProductSheet(true);
   };
@@ -164,6 +184,7 @@ const ProductsPage = () => {
       lowStockThreshold: product.lowStockThreshold || 10,
       initialStock: product.inventory?.[0]?.quantity || 0,
       description: product.description || "",
+      isOnline: product.isOnline !== false,
     });
     setShowProductSheet(true);
   };
@@ -179,6 +200,7 @@ const ProductsPage = () => {
       lowStockThreshold: parseInt(data.lowStockThreshold) || 10,
       openingStock: parseFloat(data.initialStock) || 0,
       description: data.description || "",
+      isOnline: Boolean(data.isOnline),
     };
 
     if (selectedProduct) {
@@ -289,64 +311,70 @@ const ProductsPage = () => {
             {products.map((product) => {
               const stockStatus = getStockStatus(product);
               return (
-                <button
-                  key={product.id}
-                  onClick={() => handleEditProduct(product)}
-                  className="ios-list-item w-full text-left"
-                >
-                  {/* Product Image/Icon */}
-                  <div className="w-12 h-12 rounded-xl bg-[var(--ios-gray-6)] flex items-center justify-center mr-3 flex-shrink-0">
-                    {product.image ? (
-                      <img
-                        src={product.image}
-                        alt={product.name}
-                        className="w-full h-full object-cover rounded-xl"
-                      />
-                    ) : (
-                      <Package className="w-6 h-6 text-[var(--ios-gray-2)]" />
-                    )}
-                  </div>
-
-                  {/* Product Info */}
-                  <div className="flex-1 min-w-0 py-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[17px] font-medium truncate pr-2">
-                        {product.name}
-                      </p>
-                      <span
-                        className={`text-[13px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${
-                          stockStatus.color === "green"
-                            ? "bg-green-100 text-green-700"
-                            : stockStatus.color === "orange"
-                            ? "bg-orange-100 text-orange-700"
-                            : stockStatus.color === "red"
-                            ? "bg-red-100 text-red-700"
-                            : "bg-gray-100 text-gray-600"
-                        }`}
-                      >
-                        {stockStatus.status}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between mt-1">
-                      <p className="text-[15px] text-[var(--ios-gray-1)]">
-                        {formatCurrency(product.sellingPrice)}
-                      </p>
-                      {product.category && (
-                        <span
-                          className="text-[13px] px-2 py-0.5 rounded-full"
-                          style={{
-                            backgroundColor: `${product.category.color}20`,
-                            color: product.category.color,
-                          }}
-                        >
-                          {product.category.name}
-                        </span>
+                <div key={product.id} className="ios-list-item w-full text-left">
+                  <button
+                    type="button"
+                    onClick={() => handleEditProduct(product)}
+                    className="flex items-center flex-1 min-w-0 text-left"
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-[var(--ios-gray-6)] flex items-center justify-center mr-3 flex-shrink-0">
+                      {product.image ? (
+                        <img
+                          src={product.image}
+                          alt={product.name}
+                          className="w-full h-full object-cover rounded-xl"
+                        />
+                      ) : (
+                        <Package className="w-6 h-6 text-[var(--ios-gray-2)]" />
                       )}
                     </div>
-                  </div>
-
-                  <ChevronRight className="w-5 h-5 text-[var(--ios-gray-3)] ml-2 flex-shrink-0" />
-                </button>
+                    <div className="flex-1 min-w-0 py-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[17px] font-medium truncate pr-2">
+                          {product.name}
+                        </p>
+                        <span
+                          className={`text-[13px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${
+                            stockStatus.color === "green"
+                              ? "bg-green-100 text-green-700"
+                              : stockStatus.color === "orange"
+                              ? "bg-orange-100 text-orange-700"
+                              : stockStatus.color === "red"
+                              ? "bg-red-100 text-red-700"
+                              : "bg-gray-100 text-gray-600"
+                          }`}
+                        >
+                          {stockStatus.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between mt-1">
+                        <p className="text-[15px] text-[var(--ios-gray-1)]">
+                          {formatCurrency(product.sellingPrice)}
+                        </p>
+                        {product.category && (
+                          <span
+                            className="text-[13px] px-2 py-0.5 rounded-full"
+                            style={{
+                              backgroundColor: `${product.category.color}20`,
+                              color: product.category.color,
+                            }}
+                          >
+                            {product.category.name}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(event) => shareProduct(event, product)}
+                    className="p-2 rounded-full text-teal-700 hover:bg-teal-50 flex-shrink-0"
+                    title="Share on WhatsApp"
+                  >
+                    <Share2 className="w-4 h-4" />
+                  </button>
+                  <ChevronRight className="w-5 h-5 text-[var(--ios-gray-3)] ml-1 flex-shrink-0" />
+                </div>
               );
             })}
           </div>
@@ -527,6 +555,14 @@ const ProductsPage = () => {
                     rows={3}
                     {...register("description")}
                   />
+                </div>
+
+                <div className="ios-section">
+                  <p className="ios-section-header">Storefront</p>
+                  <label className="flex items-center justify-between bg-white rounded-xl px-4 py-3">
+                    <span>Show in online shop</span>
+                    <input type="checkbox" {...register("isOnline")} />
+                  </label>
                 </div>
 
                 {/* Delete Button */}

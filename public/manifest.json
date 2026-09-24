@@ -1,6 +1,6 @@
 {
-  "name": "Inventria Mobile - Inventory Management",
-  "short_name": "Inventria",
+  "name": "sakora Mobile - Inventory Management",
+  "short_name": "sakora",
   "description": "Mobile-first inventory management system for small businesses",
   "start_url": "/",
   "display": "standalone",

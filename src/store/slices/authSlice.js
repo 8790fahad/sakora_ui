@@ -120,7 +120,7 @@ const authSlice = createSlice({
 
       // Set token in API service
       api.setToken(action.payload.token)
-      localStorage.setItem('inventria_user', JSON.stringify(action.payload.user))
+      localStorage.setItem('sakora_user', JSON.stringify(action.payload.user))
     },
     clearAuth: (state) => {
       state.user = null
@@ -130,7 +130,7 @@ const authSlice = createSlice({
 
       // Remove token from API service
       api.removeToken()
-      localStorage.removeItem('inventria_user')
+      localStorage.removeItem('sakora_user')
     }
   },
   extraReducers: (builder) => {
@@ -146,7 +146,7 @@ const authSlice = createSlice({
         state.token = action.payload.token
         state.isAuthenticated = true
         state.error = null
-        localStorage.setItem('inventria_user', JSON.stringify(action.payload.user))
+        localStorage.setItem('sakora_user', JSON.stringify(action.payload.user))
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.isLoading = false
@@ -165,7 +165,7 @@ const authSlice = createSlice({
         state.token = action.payload.token
         state.isAuthenticated = true
         state.error = null
-        localStorage.setItem('inventria_user', JSON.stringify(action.payload.user))
+        localStorage.setItem('sakora_user', JSON.stringify(action.payload.user))
       })
       .addCase(registerUser.rejected, (state, action) => {
         state.isLoading = false
@@ -180,7 +180,7 @@ const authSlice = createSlice({
         state.isAuthenticated = false
         state.error = null
         state.isLoading = false
-        localStorage.removeItem('inventria_user')
+        localStorage.removeItem('sakora_user')
       })
 
       // Fetch Profile
@@ -237,3 +237,11 @@ export const selectUser = (state) => state.auth.user
 export const selectIsAuthenticated = (state) => state.auth.isAuthenticated
 export const selectAuthLoading = (state) => state.auth.isLoading
 export const selectAuthError = (state) => state.auth.error
+export const selectUserPermissions = (state) =>
+  state.auth.user?.permissions || []
+export const selectHasPermission = (permission) => (state) => {
+  const user = state.auth.user
+  if (!user) return false
+  if (user.role === "owner") return true
+  return (user.permissions || []).includes(permission)
+}

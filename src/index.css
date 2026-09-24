@@ -1,4 +1,4 @@
-/* iOS-style Design System for Inventria Mobile */
+/* iOS-style Design System for sakora Mobile */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 @tailwind base;
@@ -8,15 +8,15 @@
 /* CSS Variables for iOS Design */
 :root {
   /* iOS System Colors */
-  --ios-blue: #007AFF;
+  --ios-blue: #0D9488;
   --ios-green: #34C759;
   --ios-red: #FF3B30;
   --ios-orange: #FF9500;
   --ios-yellow: #FFCC00;
-  --ios-teal: #5AC8FA;
+  --ios-teal: #2DD4BF;
   --ios-purple: #AF52DE;
   --ios-pink: #FF2D55;
-  --ios-indigo: #5856D6;
+  --ios-indigo: #0F766E;
 
   /* iOS Gray Scale */
   --ios-gray-1: #8E8E93;

@@ -89,7 +89,7 @@ const PWAInstallPrompt = () => {
 
           <div className="ml-3 flex-1">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-              Install Inventria Mobile
+              Install sakora Mobile
             </h3>
             <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
               Get faster access and work offline by installing our app on your device.

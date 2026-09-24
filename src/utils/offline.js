@@ -1,8 +1,8 @@
-// Offline storage and sync utilities for Inventria Mobile
+// Offline storage and sync utilities for sakora Mobile
 
 class OfflineStorage {
   constructor() {
-    this.dbName = 'InventriaOfflineDB';
+    this.dbName = 'sakoraOfflineDB';
     this.dbVersion = 1;
     this.db = null;
   }
@@ -293,7 +293,7 @@ class SyncManager {
       // Trigger background sync via service worker
       if ('serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype) {
         const registration = await navigator.serviceWorker.ready;
-        await registration.sync.register('inventria-sync');
+        await registration.sync.register('sakora-sync');
       }
 
     } catch (error) {
@@ -489,7 +489,7 @@ export const clearServiceWorkerCache = async () => {
       // Also clear IndexedDB sync queue
       if ('indexedDB' in window) {
         const db = await new Promise((resolve, reject) => {
-          const request = indexedDB.open('InventriaSyncDB', 1);
+          const request = indexedDB.open('sakoraSyncDB', 1);
           request.onsuccess = () => resolve(request.result);
           request.onerror = () => reject(request.error);
         });

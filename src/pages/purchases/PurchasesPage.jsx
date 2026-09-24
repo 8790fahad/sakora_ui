@@ -49,6 +49,13 @@ const PurchasesPage = () => {
 
   const queryClient = useQueryClient();
 
+  const { data: settingsData } = useQuery("settings", api.settings.get, {
+    refetchOnWindowFocus: false,
+  });
+  const vatEnabled = Boolean(settingsData?.data?.business?.taxEnabled);
+  const vatRate = parseFloat(settingsData?.data?.business?.taxRate || 0);
+  const vatName = settingsData?.data?.business?.taxName || "VAT";
+
   // Fetch purchases
   const {
     data: purchasesData,
@@ -116,7 +123,10 @@ const PurchasesPage = () => {
     (sum, item) => sum + item.quantity * item.unitCost,
     0
   );
-  const total = subtotal + purchaseForm.tax - purchaseForm.discount;
+  const inputVat = vatEnabled
+    ? (subtotal * vatRate) / 100
+    : purchaseForm.tax || 0;
+  const total = subtotal + inputVat - purchaseForm.discount;
 
   const resetForm = () => {
     setPurchaseForm({
@@ -193,7 +203,11 @@ const PurchasesPage = () => {
       return;
     }
 
-    createPurchaseMutation.mutate(purchaseForm);
+    createPurchaseMutation.mutate({
+      ...purchaseForm,
+      tax: inputVat,
+      taxRate: vatEnabled ? vatRate : 0,
+    });
   };
 
   const formatCurrency = (amount) => {
@@ -685,22 +699,30 @@ const PurchasesPage = () => {
                   </div>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600 dark:text-gray-400">Tax:</span>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      className="form-input w-24 text-right"
-                      value={purchaseForm.tax}
-                      onChange={(e) =>
-                        setPurchaseForm({
-                          ...purchaseForm,
-                          tax: parseFloat(e.target.value) || 0,
-                        })
-                      }
-                    />
-                  </div>
+                  <span className="text-gray-600 dark:text-gray-400">
+                    {vatEnabled ? `Input ${vatName} (${vatRate}%)` : "Tax"}:
+                  </span>
+                  {vatEnabled ? (
+                    <span className="font-medium">
+                      {formatCurrency(inputVat)}
+                    </span>
+                  ) : (
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className="form-input w-24 text-right"
+                        value={purchaseForm.tax}
+                        onChange={(e) =>
+                          setPurchaseForm({
+                            ...purchaseForm,
+                            tax: parseFloat(e.target.value) || 0,
+                          })
+                        }
+                      />
+                    </div>
+                  )}
                 </div>
                 <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
                   <div className="flex justify-between">

@@ -1,6 +1,6 @@
-// Service Worker for Inventria Mobile
-const CACHE_NAME = 'inventria-v1';
-const API_CACHE_NAME = 'inventria-api-v1';
+// Service Worker for sakora Mobile
+const CACHE_NAME = 'sakora-v1';
+const API_CACHE_NAME = 'sakora-api-v1';
 
 // Assets to cache for offline use
 const STATIC_ASSETS = [
@@ -258,7 +258,7 @@ async function queueRequestForSync(request) {
 // Open IndexedDB for sync queue
 function openSyncDatabase() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('InventriaSyncDB', 1);
+    const request = indexedDB.open('sakoraSyncDB', 1);
 
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
@@ -286,7 +286,7 @@ function openSyncDatabase() {
 self.addEventListener('sync', (event) => {
   console.log('Background sync triggered:', event.tag);
 
-  if (event.tag === 'inventria-sync') {
+  if (event.tag === 'sakora-sync') {
     event.waitUntil(syncQueuedRequests());
   }
 });
@@ -363,7 +363,7 @@ self.addEventListener('push', (event) => {
   };
 
   event.waitUntil(
-    self.registration.showNotification('Inventria', options)
+    self.registration.showNotification('sakora', options)
   );
 });
 

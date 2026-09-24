@@ -58,8 +58,12 @@ const registerSchema = yup.object().shape({
     .required("Please confirm your password"),
   acceptTerms: yup
     .boolean()
-    .oneOf([true], "You must accept the terms and conditions")
-    .required("You must accept the terms and conditions"),
+    .oneOf(
+      [true],
+      "You must agree to the General Terms of Use, Merchant Terms of Use & General Privacy Policy"
+    )
+    .required("You must agree to the terms"),
+  marketingOptIn: yup.boolean(),
 });
 
 const RegisterPage = () => {
@@ -80,6 +84,7 @@ const RegisterPage = () => {
     resolver: yupResolver(registerSchema),
     defaultValues: {
       acceptTerms: false,
+      marketingOptIn: false,
     },
   });
 
@@ -132,12 +137,14 @@ const RegisterPage = () => {
         phone: data.phone,
         password: data.password,
         businessName: data.businessName,
+        acceptTerms: true,
+        marketingOptIn: Boolean(data.marketingOptIn),
       };
 
       console.log("Sending registration data:", registrationData); // Debug log
 
       await dispatch(registerUser(registrationData)).unwrap();
-      toast.success("Account created successfully! Welcome to Inventria!");
+      toast.success("Account created successfully! Welcome to sakora!");
       // Navigation will happen automatically after successful registration
     } catch (error) {
       console.error("Registration failed:", error);
@@ -369,41 +376,65 @@ const RegisterPage = () => {
           )}
         </div>
 
-        {/* Terms and Conditions */}
-        <div className="flex items-start">
-          <div className="flex items-center h-5">
+        <div className="space-y-3 pt-1">
+          <label className="flex items-start gap-3 cursor-pointer">
             <input
               id="acceptTerms"
               type="checkbox"
-              className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+              className="mt-1 w-4 h-4 accent-teal-600 border-gray-300 rounded focus:ring-teal-500"
               {...register("acceptTerms")}
             />
-          </div>
-          <div className="ml-3 text-sm">
-            <label
-              htmlFor="acceptTerms"
-              className="text-gray-700 dark:text-gray-300"
-            >
+            <span className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
               I agree to the{" "}
-              <a
-                href="#"
-                className="text-primary-600 hover:text-primary-500 dark:text-primary-400 font-medium"
+              <Link
+                to="/legal/terms"
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary-600 hover:text-primary-500 font-medium"
+                onClick={(event) => event.stopPropagation()}
               >
-                Terms of Service
-              </a>{" "}
-              and{" "}
-              <a
-                href="#"
-                className="text-primary-600 hover:text-primary-500 dark:text-primary-400 font-medium"
+                General Terms of Use
+              </Link>
+              ,{" "}
+              <Link
+                to="/legal/merchant-terms"
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary-600 hover:text-primary-500 font-medium"
+                onClick={(event) => event.stopPropagation()}
               >
-                Privacy Policy
-              </a>
-            </label>
-          </div>
+                Merchant Terms of Use
+              </Link>{" "}
+              &amp;{" "}
+              <Link
+                to="/legal/privacy"
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary-600 hover:text-primary-500 font-medium"
+                onClick={(event) => event.stopPropagation()}
+              >
+                General Privacy Policy
+              </Link>{" "}
+              of Sakora
+            </span>
+          </label>
+          {errors.acceptTerms && (
+            <p className="form-error">{errors.acceptTerms.message}</p>
+          )}
+
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              id="marketingOptIn"
+              type="checkbox"
+              className="mt-1 w-4 h-4 accent-teal-600 border-gray-300 rounded focus:ring-teal-500"
+              {...register("marketingOptIn")}
+            />
+            <span className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+              I&apos;ll like to receive marketing communication and business tips from
+              Sakora.
+            </span>
+          </label>
         </div>
-        {errors.acceptTerms && (
-          <p className="form-error -mt-2">{errors.acceptTerms.message}</p>
-        )}
 
         {/* Submit button */}
         <button

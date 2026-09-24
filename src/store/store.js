@@ -10,7 +10,7 @@ import syncSlice from './slices/syncSlice'
 
 // Persist config
 const persistConfig = {
-  key: 'inventria-mobile',
+  key: 'sakora-mobile',
   storage,
   whitelist: ['auth', 'business', 'sync'], // Only persist these reducers
   version: 1,

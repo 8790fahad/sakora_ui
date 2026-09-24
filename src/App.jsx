@@ -27,9 +27,18 @@ import CustomersPage from "./pages/customers/CustomersPage";
 import SuppliersPage from "./pages/suppliers/SuppliersPage";
 import CashPage from "./pages/cash/CashPage";
 import ReportsPage from "./pages/reports/ReportsPage";
+import VatPage from "./pages/vat/VatPage";
 import SettingsPage from "./pages/settings/SettingsPage";
 import ProfilePage from "./pages/profile/ProfilePage";
 import NotFoundPage from "./pages/errors/NotFoundPage";
+import StorePage from "./pages/storefront/StorePage";
+import OrderStatusPage from "./pages/storefront/OrderStatusPage";
+import StorefrontSettingsPage from "./pages/storefront/StorefrontSettingsPage";
+import OrdersPage from "./pages/orders/OrdersPage";
+import TeamPage from "./pages/team/TeamPage";
+import BillingPage from "./pages/billing/BillingPage";
+import InvoicesPage from "./pages/invoices/InvoicesPage";
+import LegalPage from "./pages/legal/LegalPage";
 
 // Import Redux slices
 import {
@@ -54,8 +63,8 @@ function App() {
   // Initialize app
   useEffect(() => {
     // Check for stored authentication
-    const storedToken = localStorage.getItem("inventria_token");
-    const storedUser = localStorage.getItem("inventria_user");
+    const storedToken = localStorage.getItem("sakora_token");
+    const storedUser = localStorage.getItem("sakora_user");
 
     if (storedToken && storedUser) {
       try {
@@ -63,8 +72,8 @@ function App() {
         dispatch(setTokenFromStorage({ token: storedToken, user }));
       } catch (error) {
         console.error("Error parsing stored user data:", error);
-        localStorage.removeItem("inventria_token");
-        localStorage.removeItem("inventria_user");
+        localStorage.removeItem("sakora_token");
+        localStorage.removeItem("sakora_user");
       }
     }
 
@@ -76,7 +85,7 @@ function App() {
     window.addEventListener("offline", handleOffline);
 
     // Apply theme
-    const storedTheme = localStorage.getItem("inventria_theme");
+    const storedTheme = localStorage.getItem("sakora_theme");
     if (storedTheme) {
       dispatch(setTheme(storedTheme));
       applyTheme(storedTheme);
@@ -93,7 +102,7 @@ function App() {
     // Listen for system theme changes
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     const handleThemeChange = (e) => {
-      const currentTheme = localStorage.getItem("inventria_theme");
+      const currentTheme = localStorage.getItem("sakora_theme");
       if (currentTheme === "system") {
         const newTheme = e.matches ? "dark" : "light";
         applyTheme(newTheme);
@@ -191,6 +200,14 @@ function App() {
             }
           />
 
+          <Route path="/legal/:slug" element={<LegalPage />} />
+
+          <Route path="/shop/:slug" element={<StorePage />} />
+          <Route
+            path="/shop/:slug/order/:orderNumber"
+            element={<OrderStatusPage />}
+          />
+
           {/* Protected routes */}
           <Route
             path="/dashboard"
@@ -220,6 +237,61 @@ function App() {
               <ProtectedRoute>
                 <DashboardLayout>
                   <SalesPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/orders"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <OrdersPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/invoices"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <InvoicesPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/storefront"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <StorefrontSettingsPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/team"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <TeamPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/billing"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <BillingPage />
                 </DashboardLayout>
               </ProtectedRoute>
             }
@@ -286,6 +358,17 @@ function App() {
               <ProtectedRoute>
                 <DashboardLayout>
                   <ReportsPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/vat"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <VatPage />
                 </DashboardLayout>
               </ProtectedRoute>
             }

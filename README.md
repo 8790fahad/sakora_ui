@@ -1,6 +1,6 @@
 # sakora_ui
 
-Frontend for Inventria Mobile — React + Vite inventory management app.
+Frontend for sakora Mobile — React + Vite inventory management app.
 
 ## Setup
 
