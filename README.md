@@ -21,7 +21,7 @@ Open [http://localhost:5173](http://localhost:5173). The marketing page is the h
 
 | Variable | Description |
 |----------|-------------|
-| `VITE_API_URL` | Backend API URL. Local default: `http://localhost:5100/api`. Production: `https://nexifour.ng/sakora/api` |
+| `VITE_API_URL` | Backend API URL. Local default: `http://localhost:5100/api`. Production: `https://nexifour.ng/sakora_api` |
 
 ## GitHub Pages
 
