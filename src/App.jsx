@@ -12,7 +12,6 @@ import AuthLayout from "./components/layouts/AuthLayout";
 import DashboardLayout from "./components/layouts/DashboardLayout";
 import LoadingScreen from "./components/ui/LoadingScreen";
 import OfflineIndicator from "./components/ui/OfflineIndicator";
-import PWAInstallPrompt from "./components/ui/PWAInstallPrompt";
 import OfflineStatus from "./components/offline/OfflineStatus";
 import ErrorBoundary from "./components/ui/ErrorBoundary";
 import {
@@ -172,7 +171,6 @@ function App() {
         {/* Offline indicator */}
         <ErrorBoundary>
           <OfflineIndicator />
-          <PWAInstallPrompt />
           <OfflineStatus />
         </ErrorBoundary>
 
