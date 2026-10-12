@@ -35,7 +35,7 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          VITE_API_URL: https://nexifour.ng/sakora_api
+          VITE_API_URL: https://nexifour.ng/sakora/api
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

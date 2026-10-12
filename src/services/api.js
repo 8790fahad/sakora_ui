@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 const API_BASE_URL =
   import.meta.env.VITE_API_URL ||
   (import.meta.env.PROD
-    ? "https://nexifour.ng/sakora_api"
+    ? "https://nexifour.ng/sakora/api"
     : "http://localhost:5100/api");
 
 // Create axios instance
