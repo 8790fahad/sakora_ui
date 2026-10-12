@@ -203,11 +203,16 @@ const PurchasesPage = () => {
       return;
     }
 
-    createPurchaseMutation.mutate({
+    const payload = {
       ...purchaseForm,
       tax: inputVat,
       taxRate: vatEnabled ? vatRate : 0,
-    });
+    };
+    if (!payload.supplierId) delete payload.supplierId;
+    if (!payload.supplierName?.trim()) delete payload.supplierName;
+    else payload.supplierName = payload.supplierName.trim();
+
+    createPurchaseMutation.mutate(payload);
   };
 
   const formatCurrency = (amount) => {
@@ -383,7 +388,7 @@ const PurchasesPage = () => {
                     <div className="flex items-center space-x-3">
                       <div className="text-right">
                         <p className="font-bold text-lg text-gray-900 dark:text-white">
-                          {formatCurrency(purchase.totalAmount)}
+                          {formatCurrency(Number(purchase.total ?? purchase.totalAmount) || 0)}
                         </p>
                         <span
                           className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(

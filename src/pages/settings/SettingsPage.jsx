@@ -472,6 +472,79 @@ const SettingsPage = () => {
                     </label>
                   </div>
 
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="checkbox"
+                      id="includeWaybill"
+                      className="form-checkbox"
+                      checked={
+                        settings.business?.receiptSettings?.includeWaybill ??
+                        true
+                      }
+                      onChange={(e) =>
+                        handleBusinessSettingChange("settings", {
+                          receiptSettings: {
+                            ...settings.business?.receiptSettings,
+                            includeWaybill: e.target.checked,
+                          },
+                        })
+                      }
+                    />
+                    <label
+                      htmlFor="includeWaybill"
+                      className="text-sm font-medium text-gray-700"
+                    >
+                      Include a waybill with the sales invoice PDF
+                    </label>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={async () => {
+                      const { downloadSalesInvoicePdf } = await import(
+                        "../../utils/salesInvoicePdf"
+                      );
+                      const business = settings.business || {};
+                      downloadSalesInvoicePdf({
+                        business,
+                        includeWaybill:
+                          business.receiptSettings?.includeWaybill !== false,
+                        sale: {
+                          saleNumber: "SAMPLE",
+                          date: new Date().toISOString(),
+                          customer: {
+                            name: "Sample customer",
+                            phone: "08000000000",
+                          },
+                          paymentMethod: "cash",
+                          paymentStatus: "paid",
+                          subtotal: 3000,
+                          taxAmount: business.taxEnabled
+                            ? 3000 * (Number(business.taxRate || 0) / 100)
+                            : 0,
+                          total: business.taxEnabled
+                            ? 3000 * (1 + Number(business.taxRate || 0) / 100)
+                            : 3000,
+                          items: [
+                            {
+                              quantity: 1,
+                              unitPrice: 3000,
+                              totalPrice: 3000,
+                              product: { name: "Sample product", unit: "piece" },
+                            },
+                          ],
+                        },
+                      });
+                    }}
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Download sales invoice PDF
+                  </button>
+                  <p className="text-xs text-gray-500">
+                    Sample invoice and waybill using your business details. Sales history downloads the same PDF for a real sale.
+                  </p>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Footer Text

@@ -96,7 +96,11 @@ const AuthLayout = ({ children }) => {
 
           {/* Footer */}
           <div className="mt-8 text-center text-sm text-gray-600 dark:text-gray-400 space-y-2">
-            <p>Made with ❤️ for small businesses</p>
+            <p>
+              <Link to="/" className="hover:text-primary-600">
+                Back to Sakora
+              </Link>
+            </p>
             <p className="text-xs">
               <Link to="/legal/terms" className="hover:text-primary-600">
                 Terms of Use

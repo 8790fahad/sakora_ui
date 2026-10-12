@@ -2,16 +2,6 @@
 const CACHE_NAME = 'sakora-v1';
 const API_CACHE_NAME = 'sakora-api-v1';
 
-// Assets to cache for offline use
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/static/js/bundle.js',
-  '/static/css/main.css',
-  '/manifest.json',
-  // Add other static assets
-];
-
 // API endpoints that can be cached
 const CACHEABLE_API_PATTERNS = [
   /^\/api\/products/,
@@ -24,18 +14,7 @@ const CACHEABLE_API_PATTERNS = [
 // Install Service Worker
 self.addEventListener('install', (event) => {
   console.log('Service Worker installing...');
-
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('Caching static assets');
-        return cache.addAll(STATIC_ASSETS);
-      })
-      .then(() => {
-        // Skip waiting to activate immediately
-        return self.skipWaiting();
-      })
-  );
+  event.waitUntil(self.skipWaiting());
 });
 
 // Activate Service Worker
@@ -44,20 +23,8 @@ self.addEventListener('activate', (event) => {
 
   event.waitUntil(
     caches.keys()
-      .then((cacheNames) => {
-        return Promise.all(
-          cacheNames.map((cacheName) => {
-            if (cacheName !== CACHE_NAME && cacheName !== API_CACHE_NAME) {
-              console.log('Deleting old cache:', cacheName);
-              return caches.delete(cacheName);
-            }
-          })
-        );
-      })
-      .then(() => {
-        // Claim all clients
-        return self.clients.claim();
-      })
+      .then((cacheNames) => Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName))))
+      .then(() => self.clients.claim())
   );
 });
 
@@ -206,8 +173,35 @@ async function handleMutationRequest(request) {
   }
 }
 
+function isViteDevRequest(url) {
+  return (
+    url.hostname === 'localhost' ||
+    url.hostname === '127.0.0.1' ||
+    url.pathname.startsWith('/src/') ||
+    url.pathname.startsWith('/@') ||
+    url.pathname.startsWith('/node_modules/')
+  );
+}
+
 // Handle static assets with cache-first strategy
 async function handleStaticRequest(request) {
+  const url = new URL(request.url);
+
+  // Never cache the Vite dev server. A stale module here loads two copies of React
+  // and the page renders blank.
+  if (isViteDevRequest(url)) {
+    return fetch(request);
+  }
+
+  if (request.mode === 'navigate') {
+    try {
+      return await fetch(request);
+    } catch (error) {
+      const offlineResponse = await caches.match('/index.html');
+      return offlineResponse || new Response('Offline', { status: 503 });
+    }
+  }
+
   const cachedResponse = await caches.match(request);
   if (cachedResponse) {
     return cachedResponse;

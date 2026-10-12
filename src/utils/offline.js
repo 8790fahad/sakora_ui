@@ -3,7 +3,7 @@
 class OfflineStorage {
   constructor() {
     this.dbName = 'sakoraOfflineDB';
-    this.dbVersion = 1;
+    this.dbVersion = 2;
     this.db = null;
   }
 
@@ -65,7 +65,7 @@ class OfflineStorage {
 
         // Settings store
         if (!db.objectStoreNames.contains('settings')) {
-          const store = db.createObjectStore('settings', { keyPath: 'key' });
+          db.createObjectStore('settings', { keyPath: 'key' });
         }
       };
     });
@@ -95,15 +95,6 @@ class OfflineStorage {
     } else {
       return store.getAll();
     }
-  }
-
-  // Get data by index
-  async getByIndex(storeName, indexName, value) {
-    await this.init();
-    const transaction = this.db.transaction([storeName], 'readonly');
-    const store = transaction.objectStore(storeName);
-    const index = store.index(indexName);
-    return index.getAll(value);
   }
 
   // Delete data from IndexedDB
@@ -137,17 +128,28 @@ class OfflineStorage {
     return queueItem;
   }
 
+  async getAllRecords(storeName) {
+    await this.init();
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction([storeName], 'readonly');
+      const store = transaction.objectStore(storeName);
+      const request = store.getAll();
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
   // Get unsynced items from queue
   async getUnsyncedItems() {
-    await this.init();
-    return this.getByIndex('offlineQueue', 'synced', false);
+    const items = await this.getAllRecords('offlineQueue');
+    return items.filter((item) => !item.synced);
   }
 
   // Mark queue item as synced
   async markSynced(id) {
     await this.init();
     const transaction = this.db.transaction(['offlineQueue'], 'readwrite');
-    const store = transaction.objectStore(offlineQueue);
+    const store = transaction.objectStore('offlineQueue');
     const item = await store.get(id);
 
     if (item) {
@@ -429,6 +431,16 @@ export const isOnline = () => navigator.onLine;
 
 export const registerServiceWorker = async () => {
   if ('serviceWorker' in navigator) {
+    if (import.meta.env.DEV) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((registration) => registration.unregister()));
+      if ('caches' in window) {
+        const names = await caches.keys();
+        await Promise.all(names.map((name) => caches.delete(name)));
+      }
+      return null;
+    }
+
     try {
       const registration = await navigator.serviceWorker.register('/sw.js');
       console.log('Service Worker registered:', registration);

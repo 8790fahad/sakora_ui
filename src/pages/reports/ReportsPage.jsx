@@ -19,7 +19,25 @@ import {
   Tag,
 } from "lucide-react";
 import { useQuery } from "react-query";
+import { Link } from "react-router-dom";
 import api from "../../services/api";
+
+const isoDate = (date) => date.toISOString().split("T")[0];
+
+const vatRangeForPeriod = (period, dateFrom, dateTo) => {
+  const now = new Date();
+  const to = isoDate(now);
+  if (period === "custom") {
+    return { from: dateFrom || isoDate(now), to: dateTo || to };
+  }
+  const start = new Date(now);
+  if (period === "day") start.setHours(0, 0, 0, 0);
+  if (period === "week") start.setDate(now.getDate() - now.getDay());
+  if (period === "month") start.setDate(1);
+  if (period === "quarter") start.setMonth(Math.floor(now.getMonth() / 3) * 3, 1);
+  if (period === "year") start.setMonth(0, 1);
+  return { from: isoDate(start), to };
+};
 
 const ReportsPage = () => {
   const [activeReport, setActiveReport] = useState("sales");
@@ -80,6 +98,16 @@ const ReportsPage = () => {
     () => api.reports.inventory(),
     {
       enabled: activeReport === "inventory",
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  const vatParams = vatRangeForPeriod(period, dateFrom, dateTo);
+  const { data: vatReportData, isLoading: vatLoading } = useQuery(
+    ["vat-report", vatParams],
+    () => api.vat.summary(vatParams),
+    {
+      enabled: activeReport === "vat",
       refetchOnWindowFocus: false,
     }
   );
@@ -147,6 +175,12 @@ const ReportsPage = () => {
       name: "Inventory",
       icon: Package,
       color: "text-orange-600",
+    },
+    {
+      key: "vat",
+      name: "VAT",
+      icon: Percent,
+      color: "text-teal-600",
     },
   ];
 
@@ -850,6 +884,44 @@ const ReportsPage = () => {
     );
   };
 
+  const renderVatReport = () => {
+    const summary = vatReportData?.data;
+    if (!summary) return null;
+    const cards = [
+      { label: "Output VAT", value: summary.outputVat, hint: "Sales and paid orders" },
+      { label: "Input VAT", value: summary.inputVat, hint: "Purchases" },
+      { label: "Payable", value: summary.payable, hint: "Output minus input" },
+      { label: "Paid", value: summary.paid, hint: "VAT remitted" },
+      { label: "Net payable", value: summary.netPayable, hint: "Payable minus paid" },
+    ];
+
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          {cards.map((card) => (
+            <div key={card.label} className="card p-5">
+              <p className="text-sm text-gray-500">{card.label}</p>
+              <p className="mt-2 text-2xl font-bold text-gray-900">
+                {formatCurrency(card.value)}
+              </p>
+              <p className="mt-1 text-xs text-gray-400">{card.hint}</p>
+            </div>
+          ))}
+        </div>
+        <div className="card p-6">
+          <p className="text-sm text-gray-600">
+            {summary.setup?.enabled
+              ? `${summary.setup.name || "VAT"} is on at ${summary.setup.rate}%.`
+              : "VAT is off in Settings. Enable it so new sales and purchases post tax."}
+          </p>
+          <Link to="/vat" className="btn btn-primary mt-4 inline-flex">
+            Open VAT ledger
+          </Link>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="px-4 py-6 sm:px-6 lg:px-8">
       {/* Header */}
@@ -1004,6 +1076,19 @@ const ReportsPage = () => {
               </div>
             ) : (
               renderInventoryReport()
+            )}
+          </>
+        )}
+
+        {activeReport === "vat" && (
+          <>
+            {vatLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
+                <p className="text-gray-600 mt-4">Generating VAT report...</p>
+              </div>
+            ) : (
+              renderVatReport()
             )}
           </>
         )}

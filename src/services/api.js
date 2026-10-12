@@ -3,7 +3,10 @@ import toast from "react-hot-toast";
 
 // Base API URL
 const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:5100/api";
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.PROD
+    ? "https://nexifour.ng/sakora/api"
+    : "http://localhost:5100/api");
 
 // Create axios instance
 const api = axios.create({
@@ -20,6 +23,7 @@ let authToken = null;
 export const setToken = (token) => {
   authToken = token;
   if (token) {
+    window.__sakoraSessionExpired = false;
     api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
     localStorage.setItem("sakora_token", token);
   } else {
@@ -110,28 +114,14 @@ api.interceptors.response.use(
 
     if (
       status === 401 &&
-      !originalRequest._retry &&
       !isAuthEndpoint &&
       !isPublicStorefront
     ) {
-      originalRequest._retry = true;
-
-      // Clear token and redirect to login
-      removeToken();
-
-      // Dispatch logout action if store is available
-      if (window.__store__) {
-        window.__store__.dispatch({ type: "auth/clearAuth" });
-      }
-
-      toast.error("Session expired. Please log in again.");
-
-      // Redirect to login page
-      if (
-        window.location.pathname !== "/login" &&
-        window.location.pathname !== "/register"
-      ) {
-        window.location.href = "/login";
+      if (!window.__sakoraSessionExpired) {
+        window.__sakoraSessionExpired = true
+        removeToken()
+        window.__store__?.dispatch({ type: "auth/clearAuth" })
+        toast.error("Session expired. Please log in again.")
       }
 
       return Promise.reject({

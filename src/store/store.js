@@ -48,5 +48,7 @@ export const store = configureStore({
 // Persistor
 export const persistor = persistStore(store)
 
+window.__store__ = store
+
 // Export store and persistor
 export default store

@@ -696,7 +696,7 @@ const SuppliersPage = () => {
                               </div>
                               <div className="text-right">
                                 <p className="font-semibold text-gray-900 dark:text-white">
-                                  {formatCurrency(purchase.totalAmount)}
+                                  {formatCurrency(Number(purchase.total ?? purchase.totalAmount) || 0)}
                                 </p>
                                 <span
                                   className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${

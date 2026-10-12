@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, Suspense, lazy } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -14,33 +14,7 @@ import LoadingScreen from "./components/ui/LoadingScreen";
 import OfflineIndicator from "./components/ui/OfflineIndicator";
 import PWAInstallPrompt from "./components/ui/PWAInstallPrompt";
 import OfflineStatus from "./components/offline/OfflineStatus";
-
-// Import pages
-import LoginPage from "./pages/auth/LoginPage";
-import RegisterPage from "./pages/auth/RegisterPage";
-import DashboardPage from "./pages/dashboard/DashboardPage";
-import ProductsPage from "./pages/products/ProductsPage";
-import SalesPage from "./pages/sales/SalesPage";
-import PurchasesPage from "./pages/purchases/PurchasesPage";
-import ExpensesPage from "./pages/expenses/ExpensesPage";
-import CustomersPage from "./pages/customers/CustomersPage";
-import SuppliersPage from "./pages/suppliers/SuppliersPage";
-import CashPage from "./pages/cash/CashPage";
-import ReportsPage from "./pages/reports/ReportsPage";
-import VatPage from "./pages/vat/VatPage";
-import SettingsPage from "./pages/settings/SettingsPage";
-import ProfilePage from "./pages/profile/ProfilePage";
-import NotFoundPage from "./pages/errors/NotFoundPage";
-import StorePage from "./pages/storefront/StorePage";
-import OrderStatusPage from "./pages/storefront/OrderStatusPage";
-import StorefrontSettingsPage from "./pages/storefront/StorefrontSettingsPage";
-import OrdersPage from "./pages/orders/OrdersPage";
-import TeamPage from "./pages/team/TeamPage";
-import BillingPage from "./pages/billing/BillingPage";
-import InvoicesPage from "./pages/invoices/InvoicesPage";
-import LegalPage from "./pages/legal/LegalPage";
-
-// Import Redux slices
+import ErrorBoundary from "./components/ui/ErrorBoundary";
 import {
   selectIsAuthenticated,
   selectAuthLoading,
@@ -48,12 +22,40 @@ import {
 } from "./store/slices/authSlice";
 import { setOnlineStatus } from "./store/slices/syncSlice";
 import { setTheme } from "./store/slices/uiSlice";
-
-// Import services
-import api from "./services/api";
-
-// Import offline utilities
 import { initializeOffline, syncManager } from "./utils/offline";
+
+const LoginPage = lazy(() => import("./pages/auth/LoginPage"));
+const RegisterPage = lazy(() => import("./pages/auth/RegisterPage"));
+const DashboardPage = lazy(() => import("./pages/dashboard/DashboardPage"));
+const ProductsPage = lazy(() => import("./pages/products/ProductsPage"));
+const SalesPage = lazy(() => import("./pages/sales/SalesPage"));
+const PurchasesPage = lazy(() => import("./pages/purchases/PurchasesPage"));
+const ExpensesPage = lazy(() => import("./pages/expenses/ExpensesPage"));
+const CustomersPage = lazy(() => import("./pages/customers/CustomersPage"));
+const SuppliersPage = lazy(() => import("./pages/suppliers/SuppliersPage"));
+const CashPage = lazy(() => import("./pages/cash/CashPage"));
+const ReportsPage = lazy(() => import("./pages/reports/ReportsPage"));
+const VatPage = lazy(() => import("./pages/vat/VatPage"));
+const SettingsPage = lazy(() => import("./pages/settings/SettingsPage"));
+const ProfilePage = lazy(() => import("./pages/profile/ProfilePage"));
+const NotFoundPage = lazy(() => import("./pages/errors/NotFoundPage"));
+const StorePage = lazy(() => import("./pages/storefront/StorePage"));
+const OrderStatusPage = lazy(() => import("./pages/storefront/OrderStatusPage"));
+const StorefrontSettingsPage = lazy(() => import("./pages/storefront/StorefrontSettingsPage"));
+const OrdersPage = lazy(() => import("./pages/orders/OrdersPage"));
+const TeamPage = lazy(() => import("./pages/team/TeamPage"));
+const BillingPage = lazy(() => import("./pages/billing/BillingPage"));
+const InvoicesPage = lazy(() => import("./pages/invoices/InvoicesPage"));
+const LegalPage = lazy(() => import("./pages/legal/LegalPage"));
+const LandingPage = lazy(() => import("./pages/landing/LandingPage"));
+
+function RouteFallback() {
+  return (
+    <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="spinner w-8 h-8" />
+    </div>
+  );
+}
 
 function App() {
   const dispatch = useDispatch();
@@ -168,14 +170,13 @@ function App() {
     <Router>
       <div className="App min-h-screen bg-gray-50 dark:bg-gray-900">
         {/* Offline indicator */}
-        <OfflineIndicator />
+        <ErrorBoundary>
+          <OfflineIndicator />
+          <PWAInstallPrompt />
+          <OfflineStatus />
+        </ErrorBoundary>
 
-        {/* PWA install prompt */}
-        <PWAInstallPrompt />
-
-        {/* Offline status and sync manager */}
-        <OfflineStatus />
-
+        <Suspense fallback={<RouteFallback />}>
         <Routes>
           {/* Public routes */}
           <Route
@@ -396,14 +397,13 @@ function App() {
             }
           />
 
-          {/* Default redirects */}
           <Route
             path="/"
             element={
               isAuthenticated ? (
                 <Navigate to="/dashboard" replace />
               ) : (
-                <Navigate to="/login" replace />
+                <LandingPage />
               )
             }
           />
@@ -411,6 +411,7 @@ function App() {
           {/* 404 page */}
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
+        </Suspense>
       </div>
     </Router>
   );

@@ -5,6 +5,7 @@ import {
   Search,
   Filter,
   Receipt,
+  FileText,
   User,
   CreditCard,
   Banknote,
@@ -27,7 +28,8 @@ const SalesPage = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [completedSale, setCompletedSale] = useState(null);
 
   // Payment form state
   const [paymentData, setPaymentData] = useState({
@@ -94,8 +96,10 @@ const SalesPage = () => {
   const createSaleMutation = useMutation(
     (saleData) => api.sales.create(saleData),
     {
-      onSuccess: (data) => {
+      onSuccess: (response) => {
         toast.success("Sale completed successfully!");
+        setCompletedSale(response?.data?.sale || null);
+        setShowPrintModal(true);
         setCart([]);
         setSelectedCustomer(null);
         setPaymentData({
@@ -106,7 +110,6 @@ const SalesPage = () => {
         });
         setShowPaymentModal(false);
         queryClient.invalidateQueries("sales-history");
-        // Could show receipt modal here
       },
       onError: (error) => {
         toast.error(error.message || "Failed to process sale");
@@ -223,6 +226,15 @@ const SalesPage = () => {
     };
 
     createSaleMutation.mutate(saleData);
+  };
+
+  const printSale = async (sale, format) => {
+    const { printSalesInvoice } = await import("../../utils/salesInvoicePdf");
+    printSalesInvoice({
+      business: settingsData?.data?.business || {},
+      sale,
+      format,
+    });
   };
 
   const formatCurrency = (amount) => {
@@ -599,10 +611,75 @@ const SalesPage = () => {
                       <p className="font-medium capitalize">{sale.status}</p>
                     </div>
                   </div>
+                  <div className="flex flex-wrap gap-2 mt-4">
+                    {[
+                      ["a4", "A4"],
+                      ["a5", "A5"],
+                      ["a6", "A6"],
+                      ["thermal", "Thermal"],
+                    ].map(([format, label]) => (
+                      <button
+                        key={format}
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        onClick={() => printSale(sale, format)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             ))
           )}
+        </div>
+      )}
+
+      {showPrintModal && completedSale && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Print invoice
+                </h3>
+                <button
+                  onClick={() => setShowPrintModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <p className="text-sm text-gray-500 mb-4">
+                {completedSale.saleNumber} · {formatCurrency(completedSale.total)}
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  ["a4", "A4"],
+                  ["a5", "A5"],
+                  ["a6", "A6"],
+                  ["thermal", "Thermal"],
+                ].map(([format, label]) => (
+                  <button
+                    key={format}
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => printSale(completedSale, format)}
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="btn btn-primary w-full mt-4"
+                onClick={() => setShowPrintModal(false)}
+              >
+                Done
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
