@@ -53,12 +53,17 @@ jobs:
           </IfModule>
           EOF
 
-      - name: Deploy via FTP
+      - name: Deploy via FTPS
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          # Hostinger certs often don't match the FTP hostname
+          security: loose
           local-dir: ./dist/
           server-dir: ${{ secrets.FTP_APP_SERVER_DIR != '' && secrets.FTP_APP_SERVER_DIR || '/app/' }}
           dangerous-clean-slate: false
+          timeout: 60000
