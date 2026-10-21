@@ -6,13 +6,12 @@ import { combineReducers } from '@reduxjs/toolkit'
 import authSlice from './slices/authSlice'
 import businessSlice from './slices/businessSlice'
 import uiSlice from './slices/uiSlice'
-import syncSlice from './slices/syncSlice'
 
 // Persist config
 const persistConfig = {
   key: 'sakora-mobile',
   storage,
-  whitelist: ['auth', 'business', 'sync'], // Only persist these reducers
+  whitelist: ['auth', 'business'],
   version: 1,
 }
 
@@ -21,7 +20,6 @@ const rootReducer = combineReducers({
   auth: authSlice,
   business: businessSlice,
   ui: uiSlice,
-  sync: syncSlice,
 })
 
 // Persisted reducer

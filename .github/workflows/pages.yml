@@ -1,10 +1,8 @@
-# Builds the Vite app (landing page + merchant UI) and deploys it to GitHub Pages.
-# In the repo: Settings → Pages → Build and deployment → Source: GitHub Actions.
+# Optional GitHub Pages deploy (manual only).
+# Primary production deploy is deploy.yml → Hostinger app.sakora.shop
 name: Deploy Sakora to GitHub Pages
 
 on:
-  push:
-    branches: ["main"]
   workflow_dispatch:
 
 permissions:
@@ -36,6 +34,7 @@ jobs:
         run: npm run build
         env:
           VITE_API_URL: https://nexifour.ng/sakora/api
+          VITE_STOREFRONT_URL: https://sakora.shop
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

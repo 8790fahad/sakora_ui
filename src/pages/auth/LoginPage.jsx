@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -9,9 +9,13 @@ import toast from "react-hot-toast";
 
 import {
   loginUser,
+  googleAuth,
   selectAuthLoading,
   selectAuthError,
+  clearError,
 } from "../../store/slices/authSlice";
+import GoogleAuthButton from "../../components/auth/GoogleAuthButton";
+import AuthDivider from "../../components/auth/AuthDivider";
 
 // Validation schema
 const loginSchema = yup.object().shape({
@@ -27,6 +31,7 @@ const loginSchema = yup.object().shape({
 
 const LoginPage = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const isLoading = useSelector(selectAuthLoading);
   const error = useSelector(selectAuthError);
 
@@ -44,9 +49,28 @@ const LoginPage = () => {
     try {
       await dispatch(loginUser(data)).unwrap();
       toast.success("Welcome back!");
-    } catch (error) {
-      // Error is handled by the thunk and shown via the error state
-      console.error("Login failed:", error);
+    } catch (err) {
+      if (err?.requiresVerification) {
+        dispatch(clearError());
+        navigate("/register", {
+          replace: true,
+          state: { verifyEmail: err.email || data.email },
+        });
+        return;
+      }
+      console.error("Login failed:", err);
+    }
+  };
+
+  const onGoogleCredential = async (idToken) => {
+    try {
+      dispatch(clearError());
+      const result = await dispatch(googleAuth({ idToken })).unwrap();
+      toast.success(
+        result?.isNewUser ? "Account created. Welcome to Sakora!" : "Welcome back!"
+      );
+    } catch (err) {
+      console.error("Google sign-in failed:", err);
     }
   };
 
@@ -70,6 +94,14 @@ const LoginPage = () => {
           </div>
         </div>
       )}
+
+      <GoogleAuthButton
+        onCredential={onGoogleCredential}
+        text="signin_with"
+        disabled={isLoading}
+        label="Sign in with Google"
+      />
+      <AuthDivider label="or sign in with email" />
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         {/* Email */}
@@ -181,17 +213,6 @@ const LoginPage = () => {
             Sign up now
           </Link>
         </p>
-      </div>
-
-      {/* Demo credentials */}
-      <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
-        <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
-          Demo Account (for testing):
-        </p>
-        <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
-          <div>Email: demo@sakora.com</div>
-          <div>Password: demo123</div>
-        </div>
       </div>
     </div>
   );

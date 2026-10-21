@@ -2,42 +2,17 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#0D9488" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
       content="Sakora helps you run your shop from your phone: inventory, sales, WhatsApp selling, invoices, and a shareable online store."
     />
 
-    <!-- Apple PWA tags -->
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="sakora Mobile" />
-
-    <!-- Apple touch icons -->
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon-152x152.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-180x180.png" />
-
-    <!-- PWA manifest -->
-    <link rel="manifest" href="/manifest.json" />
-
-    <!-- Preload critical fonts -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
     <title>Sakora — Selling made easy</title>
-    <script>
-      if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistrations().then((registrations) => {
-            registrations.forEach((registration) => registration.unregister());
-          });
-        }
-      }
-    </script>
   </head>
   <body>
     <div id="root"></div>

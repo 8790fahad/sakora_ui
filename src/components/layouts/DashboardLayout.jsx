@@ -26,10 +26,13 @@ import {
   CreditCard,
   Shield,
   Percent,
+  LifeBuoy,
+  Gift,
 } from "lucide-react";
 
 import { selectUser, logoutUser } from "../../store/slices/authSlice";
 import api from "../../services/api";
+import { applyBrandColors } from "../../utils/brandImage";
 
 const DashboardLayout = ({ children }) => {
   const dispatch = useDispatch();
@@ -46,6 +49,8 @@ const DashboardLayout = ({ children }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [remoteNotes, setRemoteNotes] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [brandLogo, setBrandLogo] = useState(null);
+  const [businessName, setBusinessName] = useState("");
 
   const loadNotifications = async () => {
     try {
@@ -61,6 +66,28 @@ const DashboardLayout = ({ children }) => {
     loadNotifications();
     const timer = setInterval(loadNotifications, 20000);
     return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await api.settings.get();
+        const business = response?.data?.business || {};
+        if (cancelled) return;
+        applyBrandColors({
+          primaryColor: business.primaryColor,
+          secondaryColor: business.secondaryColor,
+        });
+        setBrandLogo(business.logo || null);
+        setBusinessName(business.name || "");
+      } catch (error) {
+        // keep default Sakora theme
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const allNavItems = [
@@ -79,8 +106,9 @@ const DashboardLayout = ({ children }) => {
     { name: "VAT", href: "/vat", icon: Percent, color: "#0D9488", permission: "reports.view" },
     { name: "Team", href: "/team", icon: Shield, color: "#5856D6", permission: "team.view" },
     { name: "Billing", href: "/billing", icon: CreditCard, color: "#34C759", permission: "billing.manage" },
-    { name: "Settings", href: "/settings", icon: Settings, color: "#8E8E93", permission: "settings.view" },
-  ].filter((item) => can(item.permission));
+    { name: "Referrals", href: "/referrals", icon: Gift, color: "#AF52DE", permission: "billing.manage" },
+    { name: "Support", href: "/support", icon: LifeBuoy, color: "#0D9488" },
+  ].filter((item) => !item.permission || can(item.permission));
 
   const unreadNotifications = unreadCount;
 
@@ -135,11 +163,13 @@ const DashboardLayout = ({ children }) => {
         >
           {!sidebarCollapsed && (
             <>
-              <div className="w-8 h-8 bg-gradient-to-br from-[var(--ios-blue)] to-[var(--ios-indigo)] rounded-xl flex items-center justify-center shadow-sm">
-                <Package className="w-4 h-4 text-white" />
-              </div>
-              <span className="ml-3 text-[17px] font-semibold text-[var(--ios-text-primary)]">
-                sakora
+              <img
+                src={brandLogo || "/brand.svg"}
+                alt=""
+                className="w-8 h-8 rounded-lg object-contain bg-white"
+              />
+              <span className="ml-3 text-[17px] font-semibold text-[var(--ios-text-primary)] truncate">
+                {businessName || "sakora"}
               </span>
             </>
           )}
@@ -218,44 +248,85 @@ const DashboardLayout = ({ children }) => {
               <Link
                 to="/profile"
                 className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--ios-blue)] to-[var(--ios-purple)] flex items-center justify-center"
+                title="Profile"
               >
                 <span className="text-white text-sm font-semibold">
                   {user?.firstName?.[0]}
                   {user?.lastName?.[0]}
                 </span>
               </Link>
+              <Link
+                to="/settings"
+                className={`p-2 rounded-lg transition-colors ${
+                  isActive("/settings")
+                    ? "bg-[var(--ios-blue)] text-white"
+                    : "text-[var(--ios-gray-1)] hover:bg-black/5 hover:text-[var(--ios-blue)]"
+                }`}
+                title="Settings"
+              >
+                <Settings className="w-4 h-4" />
+              </Link>
               <button
                 onClick={handleLogout}
                 className="p-2 rounded-lg text-[var(--ios-red)] hover:bg-red-50 transition-colors"
+                title="Log out"
               >
                 <LogOut className="w-4 h-4" />
               </button>
             </div>
           ) : (
-            <div className="flex items-center p-2 rounded-xl hover:bg-black/5 transition-colors">
+            <div className="space-y-1">
               <Link
-                to="/profile"
-                className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--ios-blue)] to-[var(--ios-purple)] flex items-center justify-center flex-shrink-0"
+                to="/settings"
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
+                  isActive("/settings")
+                    ? "bg-[var(--ios-blue)] text-white shadow-sm"
+                    : "text-[var(--ios-text-primary)] hover:bg-black/5"
+                }`}
               >
-                <span className="text-white font-semibold">
-                  {user?.firstName?.[0]}
-                  {user?.lastName?.[0]}
-                </span>
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{
+                    backgroundColor: isActive("/settings")
+                      ? "rgba(255,255,255,0.2)"
+                      : "#8E8E9315",
+                  }}
+                >
+                  <Settings
+                    className="w-5 h-5"
+                    style={{
+                      color: isActive("/settings") ? "white" : "#8E8E93",
+                    }}
+                  />
+                </div>
+                <span className="text-[15px] font-medium">Settings</span>
               </Link>
-              <Link to="/profile" className="ml-3 flex-1 min-w-0">
-                <p className="text-[15px] font-semibold text-[var(--ios-text-primary)] truncate">
-                  {user?.firstName} {user?.lastName}
-                </p>
-                <p className="text-[13px] text-[var(--ios-gray-1)] truncate">
-                  {user?.business?.name}
-                </p>
-              </Link>
-              <button
-                onClick={handleLogout}
-                className="p-2 rounded-lg text-[var(--ios-gray-1)] hover:text-[var(--ios-red)] hover:bg-red-50 transition-colors"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
+              <div className="flex items-center p-2 rounded-xl hover:bg-black/5 transition-colors">
+                <Link
+                  to="/profile"
+                  className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--ios-blue)] to-[var(--ios-purple)] flex items-center justify-center flex-shrink-0"
+                >
+                  <span className="text-white font-semibold">
+                    {user?.firstName?.[0]}
+                    {user?.lastName?.[0]}
+                  </span>
+                </Link>
+                <Link to="/profile" className="ml-3 flex-1 min-w-0">
+                  <p className="text-[15px] font-semibold text-[var(--ios-text-primary)] truncate">
+                    {user?.firstName} {user?.lastName}
+                  </p>
+                  <p className="text-[13px] text-[var(--ios-gray-1)] truncate">
+                    {user?.business?.name}
+                  </p>
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="p-2 rounded-lg text-[var(--ios-gray-1)] hover:text-[var(--ios-red)] hover:bg-red-50 transition-colors"
+                  title="Log out"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -315,14 +386,16 @@ const DashboardLayout = ({ children }) => {
                   </span>
                 )}
               </button>
-              {/* Desktop: Quick Action Button */}
-              <button
-                onClick={() => navigate("/sales")}
-                className="hidden md:flex items-center gap-2 ml-2 px-4 py-2 bg-[var(--ios-blue)] text-white rounded-full text-[15px] font-medium hover:bg-[var(--ios-blue)]/90 transition-colors shadow-sm"
-              >
-                <Plus className="w-4 h-4" />
-                New Sale
-              </button>
+              {/* Desktop: Quick Action Button (hidden on Products — page has New Product) */}
+              {!location.pathname.startsWith("/products") && (
+                <button
+                  onClick={() => navigate("/sales")}
+                  className="hidden md:flex items-center gap-2 ml-2 px-4 py-2 bg-[var(--ios-blue)] text-white rounded-full text-[15px] font-medium hover:bg-[var(--ios-blue)]/90 transition-colors shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  New Sale
+                </button>
+              )}
             </div>
           </div>
 
@@ -472,6 +545,27 @@ const DashboardLayout = ({ children }) => {
               </div>
             </div>
 
+            {/* Settings — always visible */}
+            <div className="ios-section">
+              <p className="ios-section-header">Account</p>
+              <div className="ios-list mx-4">
+                <Link
+                  to="/settings"
+                  onClick={() => setShowMore(false)}
+                  className="ios-list-item"
+                >
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center mr-3"
+                    style={{ backgroundColor: "#8E8E9320" }}
+                  >
+                    <Settings className="w-4 h-4" style={{ color: "#8E8E93" }} />
+                  </div>
+                  <span className="ios-list-item-title flex-1">Settings</span>
+                  <ChevronRight className="w-5 h-5 text-[var(--ios-gray-3)]" />
+                </Link>
+              </div>
+            </div>
+
             {/* More Menu Items */}
             <div className="ios-section">
               <p className="ios-section-header">More Options</p>
@@ -526,17 +620,19 @@ const DashboardLayout = ({ children }) => {
       )}
 
       {/* ==================== MOBILE FAB ==================== */}
-      <button
-        onClick={() => navigate("/sales")}
-        className="md:hidden fixed z-40 w-14 h-14 rounded-full shadow-lg flex items-center justify-center bg-[var(--ios-blue)] active:scale-95 transition-transform"
-        style={{
-          right: "20px",
-          bottom: "calc(var(--tab-bar-height) + 16px)",
-        }}
-        aria-label="New Sale"
-      >
-        <Plus className="w-6 h-6 text-white" />
-      </button>
+      {!location.pathname.startsWith("/products") && (
+        <button
+          onClick={() => navigate("/sales")}
+          className="md:hidden fixed z-40 w-14 h-14 rounded-full shadow-lg flex items-center justify-center bg-[var(--ios-blue)] active:scale-95 transition-transform"
+          style={{
+            right: "20px",
+            bottom: "calc(var(--tab-bar-height) + 16px)",
+          }}
+          aria-label="New Sale"
+        >
+          <Plus className="w-6 h-6 text-white" />
+        </button>
+      )}
     </div>
   );
 };

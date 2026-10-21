@@ -1,0 +1,64 @@
+# Build merchant app and deploy to Hostinger under /app
+# (app.sakora.shop document root, or sakora.shop/public_html/app).
+# Required GitHub secrets:
+#   FTP_SERVER      e.g. ftp.sakora.shop
+#   FTP_USERNAME
+#   FTP_PASSWORD
+# Optional:
+#   FTP_APP_SERVER_DIR  override (default /app/)
+name: Deploy app to Hostinger
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+concurrency:
+  group: app-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_API_URL: https://nexifour.ng/sakora/api
+          VITE_STOREFRONT_URL: https://sakora.shop
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+
+      - name: Add Apache SPA fallback
+        run: |
+          cat > dist/.htaccess <<'EOF'
+          <IfModule mod_rewrite.c>
+            RewriteEngine On
+            RewriteBase /
+            RewriteCond %{REQUEST_FILENAME} -f [OR]
+            RewriteCond %{REQUEST_FILENAME} -d
+            RewriteRule ^ - [L]
+            RewriteRule ^ index.html [L]
+          </IfModule>
+          EOF
+
+      - name: Deploy via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./dist/
+          server-dir: ${{ secrets.FTP_APP_SERVER_DIR != '' && secrets.FTP_APP_SERVER_DIR || '/app/' }}
+          dangerous-clean-slate: false

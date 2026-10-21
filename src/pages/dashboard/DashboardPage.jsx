@@ -30,7 +30,12 @@ const DashboardPage = () => {
   const { data: shopData } = useQuery(
     "storefront-settings",
     api.storefront.settings,
-    { refetchOnWindowFocus: false }
+    {
+      refetchOnWindowFocus: false,
+      // Staff may lack storefront.manage — don't toast a permission error on Home
+      retry: false,
+      onError: () => {},
+    }
   );
   const { data: ordersData } = useQuery(
     "home-orders",

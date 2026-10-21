@@ -41,7 +41,7 @@ const vatRangeForPeriod = (period, dateFrom, dateTo) => {
 
 const ReportsPage = () => {
   const [activeReport, setActiveReport] = useState("sales");
-  const [period, setPeriod] = useState("month");
+  const [period, setPeriod] = useState("day");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 

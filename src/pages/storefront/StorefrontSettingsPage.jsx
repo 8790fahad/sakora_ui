@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "react-query";
 import { Copy, Store, MessageCircle } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../../services/api";
-import { shareShopText, whatsappLink, copyText, asSettings } from "../../utils/share";
+import { shareShopText, whatsappLink, copyText, asSettings, shopUrl } from "../../utils/share";
 
 const StorefrontSettingsPage = () => {
   const queryClient = useQueryClient();
@@ -38,7 +38,7 @@ const StorefrontSettingsPage = () => {
     },
   });
 
-  const url = settings.url || (form.slug ? `${window.location.origin}/shop/${form.slug}` : "");
+  const url = settings.url || (form.slug ? shopUrl(form.slug) : "");
 
   return (
     <div className="p-4 md:p-8 max-w-2xl">
@@ -48,8 +48,13 @@ const StorefrontSettingsPage = () => {
       </p>
 
       <div className="bg-white rounded-2xl border p-5 space-y-4">
-        <label className="flex items-center justify-between">
-          <span className="font-medium">Enable storefront</span>
+        <label className="flex items-center justify-between gap-4">
+          <span>
+            <span className="font-medium block">Enable storefront</span>
+            <span className="text-sm text-slate-500">
+              Turning this on switches the shop to online only, so sales update the storefront immediately.
+            </span>
+          </span>
           <input
             type="checkbox"
             checked={form.enabled}

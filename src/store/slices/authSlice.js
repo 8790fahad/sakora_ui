@@ -24,7 +24,11 @@ export const loginUser = createAsyncThunk(
 
       return response.data
     } catch (error) {
-      return rejectWithValue(error.message || error.response?.data?.message || 'Login failed')
+      return rejectWithValue({
+        message: error.message || error.response?.data?.message || 'Login failed',
+        requiresVerification: Boolean(error.data?.requiresVerification),
+        email: error.data?.email || credentials.email,
+      })
     }
   }
 )
@@ -34,15 +38,59 @@ export const registerUser = createAsyncThunk(
   async (userData, { rejectWithValue }) => {
     try {
       const response = await api.post('/auth/register', userData)
+      const payload = response.data || {}
 
-      // Set token in API service
-      // Response interceptor returns response.data, so response = {success: true, data: {token: ...}}
-      // response.data = {token: ...}
+      // Registration now requires email verification before a session is created
+      if (payload.token) {
+        api.setToken(payload.token)
+      }
+
+      return payload
+    } catch (error) {
+      return rejectWithValue(error.message || error.response?.data?.message || 'Registration failed')
+    }
+  }
+)
+
+export const verifyEmail = createAsyncThunk(
+  'auth/verifyEmail',
+  async ({ email, code }, { rejectWithValue }) => {
+    try {
+      const response = await api.post('/auth/verify-email', { email, code })
       api.setToken(response.data.token)
-
       return response.data
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Registration failed')
+      return rejectWithValue(error.message || 'Email verification failed')
+    }
+  }
+)
+
+export const resendVerification = createAsyncThunk(
+  'auth/resendVerification',
+  async ({ email }, { rejectWithValue }) => {
+    try {
+      const response = await api.post('/auth/resend-verification', { email })
+      return response.data || response
+    } catch (error) {
+      return rejectWithValue(error.message || 'Failed to resend verification code')
+    }
+  }
+)
+
+export const googleAuth = createAsyncThunk(
+  'auth/google',
+  async ({ idToken, businessName, marketingOptIn, referralCode }, { rejectWithValue }) => {
+    try {
+      const response = await api.post('/auth/google', {
+        idToken,
+        businessName,
+        marketingOptIn,
+        referralCode,
+      })
+      api.setToken(response.data.token)
+      return response.data
+    } catch (error) {
+      return rejectWithValue(error.message || 'Google sign-in failed')
     }
   }
 )
@@ -150,7 +198,10 @@ const authSlice = createSlice({
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.isLoading = false
-        state.error = action.payload
+        state.error =
+          typeof action.payload === 'string'
+            ? action.payload
+            : action.payload?.message || 'Login failed'
         state.isAuthenticated = false
       })
 
@@ -161,13 +212,70 @@ const authSlice = createSlice({
       })
       .addCase(registerUser.fulfilled, (state, action) => {
         state.isLoading = false
+        state.error = null
+        if (action.payload?.token && action.payload?.user) {
+          state.user = action.payload.user
+          state.token = action.payload.token
+          state.isAuthenticated = true
+          localStorage.setItem('sakora_user', JSON.stringify(action.payload.user))
+        } else {
+          state.user = null
+          state.token = null
+          state.isAuthenticated = false
+        }
+      })
+      .addCase(registerUser.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.payload
+        state.isAuthenticated = false
+      })
+
+      // Verify email
+      .addCase(verifyEmail.pending, (state) => {
+        state.isLoading = true
+        state.error = null
+      })
+      .addCase(verifyEmail.fulfilled, (state, action) => {
+        state.isLoading = false
         state.user = action.payload.user
         state.token = action.payload.token
         state.isAuthenticated = true
         state.error = null
         localStorage.setItem('sakora_user', JSON.stringify(action.payload.user))
       })
-      .addCase(registerUser.rejected, (state, action) => {
+      .addCase(verifyEmail.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.payload
+      })
+
+      // Resend verification
+      .addCase(resendVerification.pending, (state) => {
+        state.isLoading = true
+        state.error = null
+      })
+      .addCase(resendVerification.fulfilled, (state) => {
+        state.isLoading = false
+        state.error = null
+      })
+      .addCase(resendVerification.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.payload
+      })
+
+      // Google auth
+      .addCase(googleAuth.pending, (state) => {
+        state.isLoading = true
+        state.error = null
+      })
+      .addCase(googleAuth.fulfilled, (state, action) => {
+        state.isLoading = false
+        state.user = action.payload.user
+        state.token = action.payload.token
+        state.isAuthenticated = true
+        state.error = null
+        localStorage.setItem('sakora_user', JSON.stringify(action.payload.user))
+      })
+      .addCase(googleAuth.rejected, (state, action) => {
         state.isLoading = false
         state.error = action.payload
         state.isAuthenticated = false
@@ -190,6 +298,9 @@ const authSlice = createSlice({
       .addCase(fetchUserProfile.fulfilled, (state, action) => {
         state.isLoading = false
         state.user = action.payload
+        if (action.payload) {
+          localStorage.setItem('sakora_user', JSON.stringify(action.payload))
+        }
       })
       .addCase(fetchUserProfile.rejected, (state, action) => {
         state.isLoading = false
@@ -205,6 +316,9 @@ const authSlice = createSlice({
         state.isLoading = false
         state.user = action.payload
         state.error = null
+        if (action.payload) {
+          localStorage.setItem('sakora_user', JSON.stringify(action.payload))
+        }
       })
       .addCase(updateUserProfile.rejected, (state, action) => {
         state.isLoading = false

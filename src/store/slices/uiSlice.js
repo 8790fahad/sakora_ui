@@ -123,13 +123,6 @@ const initialState = {
     cameraActive: false,
     scannerActive: false,
   },
-
-  // Offline state
-  offline: {
-    isOffline: false,
-    lastSyncTime: null,
-    pendingSyncItems: 0,
-  },
 };
 
 // UI slice
@@ -290,17 +283,6 @@ const uiSlice = createSlice({
       state.mobile.scannerActive = action.payload;
     },
 
-    // Offline
-    setOfflineStatus: (state, action) => {
-      state.offline.isOffline = action.payload;
-    },
-    updateSyncTime: (state) => {
-      state.offline.lastSyncTime = new Date().toISOString();
-    },
-    setPendingSyncItems: (state, action) => {
-      state.offline.pendingSyncItems = action.payload;
-    },
-
     // Reset UI state
     resetUI: (state) => {
       return initialState;
@@ -361,11 +343,6 @@ export const {
   setCamera,
   setScanner,
 
-  // Offline
-  setOfflineStatus,
-  updateSyncTime,
-  setPendingSyncItems,
-
   // Reset
   resetUI,
 } = uiSlice.actions;
@@ -386,5 +363,4 @@ export const selectSearch = (state) => state.ui.search;
 export const selectFilters = (state) => state.ui.filters;
 export const selectPagination = (state) => state.ui.pagination;
 export const selectMobile = (state) => state.ui.mobile;
-export const selectOffline = (state) => state.ui.offline;
 

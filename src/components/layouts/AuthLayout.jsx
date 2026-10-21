@@ -1,18 +1,18 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Smartphone, Shield, Zap, BarChart3 } from "lucide-react";
+import { Shield, Zap, BarChart3 } from "lucide-react";
 
-const AuthLayout = ({ children }) => {
+const websiteUrl = import.meta.env.VITE_WEBSITE_URL || "http://localhost:5174";
+
+const AuthLayout = ({ children, wide = false }) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 dark:from-gray-900 dark:to-gray-800 flex flex-col lg:flex-row">
       {/* Left side - Hero section (hidden on mobile) */}
-      <div className="hidden lg:flex lg:flex-1 lg:flex-col lg:justify-center lg:px-20 bg-gradient-to-br from-primary-600 to-primary-700 text-white">
+      <div className="hidden lg:flex lg:w-[42%] xl:w-[38%] lg:flex-col lg:justify-center lg:px-12 xl:px-16 bg-gradient-to-br from-primary-600 to-primary-700 text-white">
         <div className="max-w-md">
           <div className="flex items-center mb-8">
             <div className="flex-shrink-0">
-              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-                <Smartphone className="w-6 h-6" />
-              </div>
+              <img src="/brand-white.svg" alt="" className="w-12 h-12" />
             </div>
             <div className="ml-4">
               <h1 className="text-3xl font-bold">Sakora</h1>
@@ -70,14 +70,16 @@ const AuthLayout = ({ children }) => {
       </div>
 
       {/* Right side - Auth form */}
-      <div className="flex-1 flex flex-col justify-center px-6 py-12 lg:px-20 xl:px-24">
-        <div className="mx-auto w-full max-w-sm lg:max-w-md">
+      <div className="flex-1 flex flex-col justify-center px-4 py-8 sm:px-8 lg:px-10 xl:px-16">
+        <div
+          className={`mx-auto w-full ${
+            wide ? "max-w-3xl" : "max-w-sm lg:max-w-md"
+          }`}
+        >
           {/* Mobile logo */}
-          <div className="flex items-center justify-center mb-8 lg:hidden">
+          <div className="flex items-center justify-center mb-6 lg:hidden">
             <div className="flex items-center">
-              <div className="w-10 h-10 bg-primary-600 rounded-xl flex items-center justify-center">
-                <Smartphone className="w-5 h-5 text-white" />
-              </div>
+              <img src="/brand.svg" alt="" className="w-10 h-10" />
               <div className="ml-3">
                 <h1 className="text-xl font-bold text-gray-900 dark:text-white">
                   sakora Mobile
@@ -90,16 +92,16 @@ const AuthLayout = ({ children }) => {
           </div>
 
           {/* Auth form content */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-100 dark:border-gray-700">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-100 dark:border-gray-700">
             {children}
           </div>
 
           {/* Footer */}
-          <div className="mt-8 text-center text-sm text-gray-600 dark:text-gray-400 space-y-2">
+          <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400 space-y-2">
             <p>
-              <Link to="/" className="hover:text-primary-600">
+              <a href={websiteUrl} className="hover:text-primary-600">
                 Back to Sakora
-              </Link>
+              </a>
             </p>
             <p className="text-xs">
               <Link to="/legal/terms" className="hover:text-primary-600">
@@ -122,4 +124,3 @@ const AuthLayout = ({ children }) => {
 };
 
 export default AuthLayout;
-

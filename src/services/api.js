@@ -86,20 +86,11 @@ api.interceptors.response.use(
 
     // Handle network errors
     if (!error.response) {
-      if (!navigator.onLine) {
-        toast.error("No internet connection. Changes will sync when online.");
-        return Promise.reject({
-          message: "Network error",
-          type: "NETWORK_ERROR",
-          offline: true,
-        });
-      } else {
-        toast.error("Network error. Please try again.");
-        return Promise.reject({
-          message: "Network error",
-          type: "NETWORK_ERROR",
-        });
-      }
+      toast.error("Network error. Please check your connection and try again.");
+      return Promise.reject({
+        message: "Network error",
+        type: "NETWORK_ERROR",
+      });
     }
 
     const { status, data } = error.response;
@@ -107,10 +98,16 @@ api.interceptors.response.use(
     // Handle authentication errors (skip login/register — those 401s are invalid credentials)
     const isAuthEndpoint =
       originalRequest.url?.includes("/auth/login") ||
-      originalRequest.url?.includes("/auth/register");
+      originalRequest.url?.includes("/auth/register") ||
+      originalRequest.url?.includes("/auth/google") ||
+      originalRequest.url?.includes("/auth/verify-email") ||
+      originalRequest.url?.includes("/auth/resend-verification") ||
+      originalRequest.url?.includes("/auth/forgot-password") ||
+      originalRequest.url?.includes("/auth/reset-password");
     const isPublicStorefront =
       /\/storefront\/(?!settings)/.test(originalRequest.url || "") ||
-      window.location.pathname.startsWith("/shop");
+      window.location.pathname.startsWith("/shop") ||
+      window.location.pathname.startsWith("/track");
 
     if (
       status === 401 &&
@@ -143,7 +140,11 @@ api.interceptors.response.use(
     }
 
     // Don't show toast for certain silent operations
-    const silentOperations = ["/auth/profile", "/dashboard/stats"];
+    const silentOperations = [
+      "/auth/profile",
+      "/dashboard/stats",
+      "/storefront/settings",
+    ];
     const isSilentOperation = silentOperations.some((path) =>
       originalRequest.url.includes(path)
     );
@@ -206,6 +207,11 @@ const apiMethods = {
   auth: {
     login: (credentials) => api.post("/auth/login", credentials),
     register: (userData) => api.post("/auth/register", userData),
+    google: (data) => api.post("/auth/google", data),
+    verifyEmail: (data) => api.post("/auth/verify-email", data),
+    resendVerification: (data) => api.post("/auth/resend-verification", data),
+    forgotPassword: (data) => api.post("/auth/forgot-password", data),
+    resetPassword: (data) => api.post("/auth/reset-password", data),
     logout: () => api.post("/auth/logout"),
     profile: () => api.get("/auth/profile"),
     updateProfile: (data) => api.put("/auth/profile", data),
@@ -232,6 +238,7 @@ const apiMethods = {
     create: (data) => api.post("/products", data),
     update: (id, data) => api.put(`/products/${id}`, data),
     delete: (id) => api.delete(`/products/${id}`),
+    bulkImport: (data) => api.post("/products/bulk-import", data),
     categories: () => api.get("/products/categories/list"),
     createCategory: (data) => api.post("/products/categories", data),
     updateCategory: (id, data) => api.put(`/products/categories/${id}`, data),
@@ -355,6 +362,8 @@ const apiMethods = {
       api.get(`/storefront/${slug}/orders/${orderNumber}`),
     verify: (slug, orderNumber, data = {}) =>
       api.post(`/storefront/${slug}/orders/${orderNumber}/verify`, data),
+    complaint: (slug, orderNumber, data) =>
+      api.post(`/storefront/${slug}/orders/${orderNumber}/complaint`, data),
     settings: () => api.get("/storefront/settings"),
     updateSettings: (data) => api.put("/storefront/settings", data),
   },
@@ -374,10 +383,24 @@ const apiMethods = {
     cancel: () => api.post("/subscriptions/cancel"),
   },
 
+  referrals: {
+    get: () => api.get("/referrals"),
+    validate: (code) => api.get(`/referrals/validate/${encodeURIComponent(code)}`),
+    requestPayout: (data = {}) => api.post("/referrals/payout-request", data),
+  },
+
   notifications: {
     list: (params = {}) => api.get("/notifications", { params }),
     markRead: (id) => api.patch(`/notifications/${id}/read`),
     markAllRead: () => api.patch("/notifications/read-all"),
+  },
+
+  support: {
+    list: () => api.get("/support"),
+    get: (id) => api.get(`/support/${id}`),
+    create: (data) => api.post("/support", data),
+    reply: (id, message) => api.post(`/support/${id}/messages`, { message }),
+    close: (id) => api.patch(`/support/${id}`, { status: "closed" }),
   },
 
   users: {

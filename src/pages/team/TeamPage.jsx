@@ -13,11 +13,20 @@ const TeamPage = () => {
     password: "",
     role: "staff",
     permissions: [],
+    defaultPaymentMethod: "cash",
+    defaultBankAccountId: "",
   });
   const [editing, setEditing] = useState(null);
 
   const { data: teamData } = useQuery("team", api.users.list);
   const { data: permData } = useQuery("permissions", api.users.permissions);
+  const { data: settingsData } = useQuery("settings", api.settings.get, {
+    refetchOnWindowFocus: false,
+  });
+  const bankAccounts =
+    settingsData?.data?.bankAccounts ||
+    settingsData?.data?.business?.bankAccounts ||
+    [];
 
   const users = teamData?.data?.users || [];
   const catalog = permData?.data?.permissions || [];
@@ -40,6 +49,8 @@ const TeamPage = () => {
         password: "",
         role: "staff",
         permissions: [],
+        defaultPaymentMethod: "cash",
+        defaultBankAccountId: "",
       });
     },
   });
@@ -48,12 +59,24 @@ const TeamPage = () => {
     ({ id, data }) => api.users.update(id, data),
     {
       onSuccess: () => {
-        toast.success("Privileges updated");
+        toast.success("Team member updated");
         queryClient.invalidateQueries("team");
         setEditing(null);
       },
     }
   );
+
+  const paymentMethodOf = (user) =>
+    user?.preferences?.pos?.defaultPaymentMethod === "bank" ? "bank" : "cash";
+
+  const bankIdOf = (user) =>
+    user?.preferences?.pos?.defaultBankAccountId || "";
+
+  const bankLabel = (id) => {
+    const bank = bankAccounts.find((item) => item.id === id);
+    if (!bank) return null;
+    return `${bank.bankName} · ${bank.accountNumber}`;
+  };
 
   const togglePermission = (key, target, setter) => {
     const current = target.permissions || [];
@@ -78,7 +101,20 @@ const TeamPage = () => {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            createUser.mutate(form);
+            const { defaultPaymentMethod, defaultBankAccountId, ...payload } =
+              form;
+            createUser.mutate({
+              ...payload,
+              preferences: {
+                pos: {
+                  defaultPaymentMethod,
+                  defaultBankAccountId:
+                    defaultPaymentMethod === "bank"
+                      ? defaultBankAccountId || null
+                      : null,
+                },
+              },
+            });
           }}
           className="bg-white rounded-2xl border p-5 space-y-3"
         >
@@ -125,6 +161,47 @@ const TeamPage = () => {
             <option value="staff">Staff</option>
             <option value="manager">Manager</option>
           </select>
+          <div>
+            <label className="block text-xs text-slate-500 mb-1">
+              Default payment method
+            </label>
+            <select
+              className="w-full border rounded-xl px-3 py-2"
+              value={form.defaultPaymentMethod}
+              onChange={(e) =>
+                setForm({ ...form, defaultPaymentMethod: e.target.value })
+              }
+            >
+              <option value="cash">Cash</option>
+              <option value="bank">Bank</option>
+            </select>
+          </div>
+          {form.defaultPaymentMethod === "bank" && (
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">
+                Default bank account
+              </label>
+              <select
+                className="w-full border rounded-xl px-3 py-2"
+                value={form.defaultBankAccountId}
+                onChange={(e) =>
+                  setForm({ ...form, defaultBankAccountId: e.target.value })
+                }
+                required={bankAccounts.length > 0}
+              >
+                <option value="">
+                  {bankAccounts.length === 0
+                    ? "Add banks in Settings first"
+                    : "Select bank"}
+                </option>
+                {bankAccounts.map((bank) => (
+                  <option key={bank.id} value={bank.id}>
+                    {bank.bankName} · {bank.accountNumber}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <p className="text-xs text-slate-500">
             Leave permissions empty to use the default role privileges.
           </p>
@@ -142,24 +219,29 @@ const TeamPage = () => {
                     {user.firstName} {user.lastName}
                   </p>
                   <p className="text-sm text-slate-500">
-                    {user.email} · {user.role}
+                    {user.email} · {user.role} ·{" "}
+                    {paymentMethodOf(user) === "bank" ? "Bank" : "Cash"} default
+                    {paymentMethodOf(user) === "bank" &&
+                    bankLabel(bankIdOf(user))
+                      ? ` · ${bankLabel(bankIdOf(user))}`
+                      : ""}
                   </p>
                 </div>
-                {user.role !== "owner" && (
-                  <button
-                    onClick={() =>
-                      setEditing({
-                        ...user,
-                        permissions: user.permissionOverrides?.length
-                          ? user.permissionOverrides
-                          : user.permissions,
-                      })
-                    }
-                    className="text-sm text-blue-600"
-                  >
-                    Edit privileges
-                  </button>
-                )}
+                <button
+                  onClick={() =>
+                    setEditing({
+                      ...user,
+                      defaultPaymentMethod: paymentMethodOf(user),
+                      defaultBankAccountId: bankIdOf(user),
+                      permissions: user.permissionOverrides?.length
+                        ? user.permissionOverrides
+                        : user.permissions,
+                    })
+                  }
+                  className="text-sm text-blue-600"
+                >
+                  Edit
+                </button>
               </div>
               <div className="mt-2 flex flex-wrap gap-1">
                 {(user.permissions || []).slice(0, 6).map((key) => (
@@ -184,41 +266,105 @@ const TeamPage = () => {
       {editing && (
         <div className="bg-white rounded-2xl border p-5">
           <h2 className="font-semibold flex items-center gap-2 mb-4">
-            <Shield className="w-4 h-4" /> Privileges for {editing.firstName}
+            <Shield className="w-4 h-4" /> Edit {editing.firstName}
           </h2>
-          {Object.entries(grouped).map(([group, items]) => (
-            <div key={group} className="mb-4">
-              <p className="text-xs uppercase text-slate-400 mb-2">{group}</p>
-              <div className="grid sm:grid-cols-2 gap-2">
-                {items.map((item) => (
-                  <label key={item.key} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={(editing.permissions || []).includes(item.key)}
-                      onChange={() =>
-                        togglePermission(item.key, editing, setEditing)
-                      }
-                    />
-                    {item.label}
-                  </label>
-                ))}
-              </div>
+          <div className="mb-4 max-w-md space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Default payment method
+              </label>
+              <select
+                className="w-full border rounded-xl px-3 py-2"
+                value={editing.defaultPaymentMethod || "cash"}
+                onChange={(e) =>
+                  setEditing({
+                    ...editing,
+                    defaultPaymentMethod: e.target.value,
+                  })
+                }
+              >
+                <option value="cash">Cash</option>
+                <option value="bank">Bank</option>
+              </select>
+              <p className="text-xs text-slate-500 mt-1">
+                Pre-selected when this user opens Sales checkout.
+              </p>
             </div>
-          ))}
+            {editing.defaultPaymentMethod === "bank" && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Default bank account
+                </label>
+                <select
+                  className="w-full border rounded-xl px-3 py-2"
+                  value={editing.defaultBankAccountId || ""}
+                  onChange={(e) =>
+                    setEditing({
+                      ...editing,
+                      defaultBankAccountId: e.target.value,
+                    })
+                  }
+                >
+                  <option value="">
+                    {bankAccounts.length === 0
+                      ? "Add banks in Settings first"
+                      : "Use business default"}
+                  </option>
+                  {bankAccounts.map((bank) => (
+                    <option key={bank.id} value={bank.id}>
+                      {bank.bankName} · {bank.accountNumber}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+          {editing.role !== "owner" &&
+            Object.entries(grouped).map(([group, items]) => (
+              <div key={group} className="mb-4">
+                <p className="text-xs uppercase text-slate-400 mb-2">{group}</p>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  {items.map((item) => (
+                    <label
+                      key={item.key}
+                      className="flex items-center gap-2 text-sm"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={(editing.permissions || []).includes(item.key)}
+                        onChange={() =>
+                          togglePermission(item.key, editing, setEditing)
+                        }
+                      />
+                      {item.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
           <div className="flex gap-3">
             <button
               onClick={() =>
                 updateUser.mutate({
                   id: editing.id,
                   data: {
-                    role: editing.role,
-                    permissions: editing.permissions,
+                    ...(editing.role !== "owner"
+                      ? {
+                          role: editing.role,
+                          permissions: editing.permissions,
+                        }
+                      : {}),
+                    defaultPaymentMethod: editing.defaultPaymentMethod,
+                    defaultBankAccountId:
+                      editing.defaultPaymentMethod === "bank"
+                        ? editing.defaultBankAccountId || null
+                        : null,
                   },
                 })
               }
               className="px-4 py-2 rounded-xl bg-blue-600 text-white"
             >
-              Save privileges
+              Save
             </button>
             <button onClick={() => setEditing(null)} className="px-4 py-2">
               Cancel

@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173). The marketing page is the home screen. Sign in and Get started go to `/login` and `/register`. Signed-in users opening `/` land on the dashboard. Each page, including the landing page, loads only when that route is opened.
+Open [http://localhost:5173](http://localhost:5173). This is the shop app: `/` goes to sign in, and a signed-in user lands on the dashboard. The marketing site is the separate `sakora_website` project at [http://localhost:5174](http://localhost:5174).
 
 ## Scripts
 
@@ -22,10 +22,12 @@ Open [http://localhost:5173](http://localhost:5173). The marketing page is the h
 | Variable | Description |
 |----------|-------------|
 | `VITE_API_URL` | Backend API URL. Local default: `http://localhost:5100/api`. Production: `https://nexifour.ng/sakora/api` |
+| `VITE_WEBSITE_URL` | Marketing site. Local default: `http://localhost:5174` |
+| `VITE_STOREFRONT_URL` | Customer shop site. Local default: `http://localhost:5175` |
 
 ## GitHub Pages
 
-`.github/workflows/pages.yml` builds this app and deploys `dist` when `main` is pushed. The landing page and the merchant app are the same site, so `sakora.shop` serves both.
+`.github/workflows/pages.yml` builds this shop app and deploys `dist` when `main` is pushed. The marketing site is `sakora_website`, not this app.
 
 1. In **sakora_ui** (not the landing repo): Settings → Pages → Source: **GitHub Actions**. Leave the Jekyll and Static HTML starters alone — this app has to be built first.
 2. Set the custom domain to `sakora.shop` on this repository. A custom domain can only be attached to one Pages site, so remove it from any other repo first.

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Settings,
   Building2,
@@ -23,16 +23,56 @@ import {
   RotateCcw,
   Check,
   X,
+  Landmark,
+  Plus,
+  Trash2,
+  Star,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "react-query";
+import { useSelector } from "react-redux";
 import { toast } from "react-hot-toast";
 import { Link } from "react-router-dom";
 import api from "../../services/api";
+import { selectUser } from "../../store/slices/authSlice";
+import {
+  PAPER_FORMATS,
+  ORIENTATIONS,
+  COLOR_MODES,
+  getDocPrintSettings,
+} from "../../utils/salesDocuments";
+
+const emptyProfile = {
+  name: "",
+  businessType: "retail",
+  phone: "",
+  email: "",
+  website: "",
+  address: "",
+  city: "",
+  state: "",
+  description: "",
+};
+
+const emptyBankDraft = {
+  bankName: "",
+  accountName: "",
+  accountNumber: "",
+};
 
 const SettingsPage = () => {
+  const user = useSelector(selectUser);
+  const canManageSettings =
+    user?.role === "owner" ||
+    (user?.permissions || []).includes("settings.manage");
+
   const [activeTab, setActiveTab] = useState("business");
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState("");
+  const [profileDraft, setProfileDraft] = useState(emptyProfile);
+  const [bankDraft, setBankDraft] = useState(emptyBankDraft);
+  const [editingBankId, setEditingBankId] = useState(null);
+  const [invoicePreviewUrl, setInvoicePreviewUrl] = useState("");
+  const [waybillPreviewUrl, setWaybillPreviewUrl] = useState("");
 
   const queryClient = useQueryClient();
 
@@ -55,7 +95,140 @@ const SettingsPage = () => {
   );
 
   const settings = settingsData?.data || {};
+  const invoicePrint = getDocPrintSettings(settings.business, "invoice");
+  const waybillPrint = getDocPrintSettings(settings.business, "waybill");
+  const invoiceEnabled =
+    settings.business?.receiptSettings?.includeInvoice !== false;
+  const waybillEnabled =
+    settings.business?.receiptSettings?.includeWaybill !== false;
   const systemInfo = systemData?.data || {};
+  const bankAccounts =
+    settings.bankAccounts || settings.business?.bankAccounts || [];
+
+  const sampleSaleForPreview = (business) => ({
+    saleNumber: "SAMPLE",
+    date: new Date().toISOString(),
+    customer: { name: "Sample customer", phone: "08000000000" },
+    paymentMethod: "cash",
+    paymentStatus: "paid",
+    subtotal: 3000,
+    taxAmount: business.taxEnabled
+      ? 3000 * (Number(business.taxRate || 0) / 100)
+      : 0,
+    total: business.taxEnabled
+      ? 3000 * (1 + Number(business.taxRate || 0) / 100)
+      : 3000,
+    paidAmount: business.taxEnabled
+      ? 3000 * (1 + Number(business.taxRate || 0) / 100)
+      : 3000,
+    items: [
+      {
+        quantity: 2,
+        unitPrice: 1500,
+        totalPrice: 3000,
+        product: { name: "Sample product", unit: "pcs" },
+      },
+    ],
+  });
+
+  const patchReceiptDoc = (kind, patch) => {
+    const receipt = settings.business?.receiptSettings || {};
+    const current = getDocPrintSettings(settings.business, kind);
+    handleBusinessSettingChange("settings", {
+      receiptSettings: {
+        ...receipt,
+        [kind]: {
+          ...current,
+          ...(receipt[kind] || {}),
+          ...patch,
+        },
+      },
+    });
+  };
+
+  const formatPreviewLabel = (print) => {
+    const paper =
+      PAPER_FORMATS.find((item) => item.id === print.paperFormat)?.label ||
+      "A4";
+    if (print.paperFormat === "thermal") return paper;
+    const orient =
+      ORIENTATIONS.find((o) => o.id === print.orientation)?.label ||
+      "Portrait";
+    const color =
+      COLOR_MODES.find((c) => c.id === print.colorMode)?.label || "Color";
+    return `${paper} · ${orient} · ${color}`;
+  };
+
+  useEffect(() => {
+    if (!settings.business) return;
+    setProfileDraft({
+      name: settings.business.name || "",
+      businessType: settings.business.businessType || "retail",
+      phone: settings.business.phone || "",
+      email: settings.business.email || "",
+      website: settings.business.website || "",
+      address: settings.business.address || "",
+      city: settings.business.city || "",
+      state: settings.business.state || "",
+      description: settings.business.description || "",
+    });
+  }, [settings.business]);
+
+  useEffect(() => {
+    const business = settings.business;
+    if (!business) return undefined;
+
+    let cancelled = false;
+    (async () => {
+      const { getSalesInvoiceBlobUrl, getSalesWaybillBlobUrl } = await import(
+        "../../utils/salesDocuments"
+      );
+      if (cancelled) return;
+
+      const sampleSale = sampleSaleForPreview(business);
+      if (invoiceEnabled) {
+        setInvoicePreviewUrl(
+          getSalesInvoiceBlobUrl({
+            business,
+            sale: sampleSale,
+            format: invoicePrint.paperFormat,
+            orientation: invoicePrint.orientation,
+            colorMode: invoicePrint.colorMode,
+          })
+        );
+      } else {
+        setInvoicePreviewUrl("");
+      }
+
+      if (waybillEnabled) {
+        setWaybillPreviewUrl(
+          getSalesWaybillBlobUrl({
+            business,
+            sale: sampleSale,
+            format: waybillPrint.paperFormat,
+            orientation: waybillPrint.orientation,
+            colorMode: waybillPrint.colorMode,
+          })
+        );
+      } else {
+        setWaybillPreviewUrl("");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    settings.business,
+    invoicePrint.paperFormat,
+    invoicePrint.orientation,
+    invoicePrint.colorMode,
+    waybillPrint.paperFormat,
+    waybillPrint.orientation,
+    waybillPrint.colorMode,
+    invoiceEnabled,
+    waybillEnabled,
+  ]);
 
   // Update business settings
   const updateBusinessMutation = useMutation(api.settings.updateBusiness, {
@@ -64,7 +237,7 @@ const SettingsPage = () => {
       refetchSettings();
     },
     onError: (error) => {
-      toast.error(error.response?.data?.message || "Failed to update settings");
+      toast.error(error.message || error.response?.data?.message || "Failed to update settings");
     },
   });
 
@@ -145,6 +318,13 @@ const SettingsPage = () => {
   };
 
   const handleBusinessSettingChange = (field, value) => {
+    if (!canManageSettings) {
+      toast.error(
+        "Only an owner or manager can change business settings. Ask them to update this, or grant you Settings access."
+      );
+      return;
+    }
+
     const updatedSettings = {
       [field]: value,
     };
@@ -168,6 +348,88 @@ const SettingsPage = () => {
     };
 
     updatePreferencesMutation.mutate({ preferences: updatedPreferences });
+  };
+
+  const saveBankAccounts = (accounts) => {
+    if (!canManageSettings) {
+      toast.error(
+        "Only an owner or manager can manage bank accounts. Ask them to add banks, or grant you Settings access."
+      );
+      return;
+    }
+    updateBusinessMutation.mutate({
+      settings: { bankAccounts: accounts },
+    });
+  };
+
+  const resetBankForm = () => {
+    setBankDraft(emptyBankDraft);
+    setEditingBankId(null);
+  };
+
+  const handleSaveBank = () => {
+    const bankName = bankDraft.bankName.trim();
+    const accountName = bankDraft.accountName.trim();
+    const accountNumber = bankDraft.accountNumber.replace(/\s+/g, "").trim();
+    if (!bankName || !accountName || !accountNumber) {
+      toast.error("Bank name, account name, and account number are required");
+      return;
+    }
+    if (!/^\d{8,20}$/.test(accountNumber)) {
+      toast.error("Enter a valid account number (8–20 digits)");
+      return;
+    }
+
+    let next;
+    if (editingBankId) {
+      next = bankAccounts.map((bank) =>
+        bank.id === editingBankId
+          ? { ...bank, bankName, accountName, accountNumber }
+          : bank
+      );
+    } else {
+      const id =
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `bank-${Date.now()}`;
+      next = [
+        ...bankAccounts,
+        {
+          id,
+          bankName,
+          accountName,
+          accountNumber,
+          isDefault: bankAccounts.length === 0,
+        },
+      ];
+    }
+    saveBankAccounts(next);
+    resetBankForm();
+  };
+
+  const handleSetDefaultBank = (id) => {
+    saveBankAccounts(
+      bankAccounts.map((bank) => ({
+        ...bank,
+        isDefault: bank.id === id,
+      }))
+    );
+  };
+
+  const handleDeleteBank = (id) => {
+    const remaining = bankAccounts.filter((bank) => bank.id !== id);
+    if (remaining.length && !remaining.some((bank) => bank.isDefault)) {
+      remaining[0].isDefault = true;
+    }
+    saveBankAccounts(remaining);
+    if (editingBankId === id) resetBankForm();
+    if (settings.pos?.defaultBankAccountId === id) {
+      handlePreferenceChange(
+        "pos",
+        "defaultBankAccountId",
+        remaining[0]?.id || null
+      );
+    }
   };
 
   const tabs = [
@@ -299,6 +561,197 @@ const SettingsPage = () => {
           {/* Business Settings */}
           {activeTab === "business" && (
             <div className="space-y-6">
+              <div className="card p-6">
+                <div className="flex items-center justify-between mb-4 gap-3">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Business profile
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Used on receipts, invoices, and your shop
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={
+                      !profileDraft || updateBusinessMutation.isLoading
+                    }
+                    onClick={() => {
+                      if (!profileDraft?.name?.trim()) {
+                        toast.error("Business name is required");
+                        return;
+                      }
+                      updateBusinessMutation.mutate(profileDraft);
+                    }}
+                  >
+                    <Save className="w-4 h-4 mr-2" />
+                    Save profile
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Business name
+                    </label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={profileDraft?.name || ""}
+                      onChange={(e) =>
+                        setProfileDraft((prev) => ({
+                          ...prev,
+                          name: e.target.value,
+                        }))
+                      }
+                      placeholder="Your business name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Business type
+                    </label>
+                    <select
+                      className="form-select"
+                      value={profileDraft?.businessType || "retail"}
+                      onChange={(e) =>
+                        setProfileDraft((prev) => ({
+                          ...prev,
+                          businessType: e.target.value,
+                        }))
+                      }
+                    >
+                      <option value="retail">Retail</option>
+                      <option value="wholesale">Wholesale</option>
+                      <option value="manufacturing">Manufacturing</option>
+                      <option value="restaurant">Restaurant</option>
+                      <option value="pharmacy">Pharmacy</option>
+                      <option value="supermarket">Supermarket</option>
+                      <option value="fashion">Fashion</option>
+                      <option value="electronics">Electronics</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Phone
+                    </label>
+                    <input
+                      type="tel"
+                      className="form-input"
+                      value={profileDraft?.phone || ""}
+                      onChange={(e) =>
+                        setProfileDraft((prev) => ({
+                          ...prev,
+                          phone: e.target.value,
+                        }))
+                      }
+                      placeholder="Business phone"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      className="form-input"
+                      value={profileDraft?.email || ""}
+                      onChange={(e) =>
+                        setProfileDraft((prev) => ({
+                          ...prev,
+                          email: e.target.value,
+                        }))
+                      }
+                      placeholder="business@email.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Website
+                    </label>
+                    <input
+                      type="url"
+                      className="form-input"
+                      value={profileDraft?.website || ""}
+                      onChange={(e) =>
+                        setProfileDraft((prev) => ({
+                          ...prev,
+                          website: e.target.value,
+                        }))
+                      }
+                      placeholder="https://"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Address
+                    </label>
+                    <textarea
+                      className="form-input"
+                      rows={2}
+                      value={profileDraft?.address || ""}
+                      onChange={(e) =>
+                        setProfileDraft((prev) => ({
+                          ...prev,
+                          address: e.target.value,
+                        }))
+                      }
+                      placeholder="Street address"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      City
+                    </label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={profileDraft?.city || ""}
+                      onChange={(e) =>
+                        setProfileDraft((prev) => ({
+                          ...prev,
+                          city: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      State
+                    </label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={profileDraft?.state || ""}
+                      onChange={(e) =>
+                        setProfileDraft((prev) => ({
+                          ...prev,
+                          state: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Short description
+                    </label>
+                    <textarea
+                      className="form-input"
+                      rows={2}
+                      value={profileDraft?.description || ""}
+                      onChange={(e) =>
+                        setProfileDraft((prev) => ({
+                          ...prev,
+                          description: e.target.value,
+                        }))
+                      }
+                      placeholder="What you sell or do"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="card p-6">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                   Currency & Tax Settings
@@ -472,78 +925,333 @@ const SettingsPage = () => {
                     </label>
                   </div>
 
-                  <div className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      id="includeWaybill"
-                      className="form-checkbox"
-                      checked={
-                        settings.business?.receiptSettings?.includeWaybill ??
-                        true
-                      }
-                      onChange={(e) =>
-                        handleBusinessSettingChange("settings", {
-                          receiptSettings: {
-                            ...settings.business?.receiptSettings,
-                            includeWaybill: e.target.checked,
-                          },
-                        })
-                      }
-                    />
-                    <label
-                      htmlFor="includeWaybill"
-                      className="text-sm font-medium text-gray-700"
-                    >
-                      Include a waybill with the sales invoice PDF
-                    </label>
+                  <div>
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="checkbox"
+                        id="includeInvoice"
+                        className="form-checkbox"
+                        checked={
+                          settings.business?.receiptSettings?.includeInvoice ??
+                          true
+                        }
+                        onChange={(e) =>
+                          handleBusinessSettingChange("settings", {
+                            receiptSettings: {
+                              ...settings.business?.receiptSettings,
+                              includeInvoice: e.target.checked,
+                            },
+                          })
+                        }
+                      />
+                      <label
+                        htmlFor="includeInvoice"
+                        className="text-sm font-medium text-gray-700"
+                      >
+                        Enable invoice on Sales
+                      </label>
+                    </div>
+                    <p className="text-xs text-gray-500 ml-7 mt-1">
+                      When enabled, Sales can print invoices using the paper,
+                      orientation, and color below.
+                    </p>
                   </div>
 
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={async () => {
-                      const { downloadSalesInvoicePdf } = await import(
-                        "../../utils/salesInvoicePdf"
-                      );
-                      const business = settings.business || {};
-                      downloadSalesInvoicePdf({
-                        business,
-                        includeWaybill:
-                          business.receiptSettings?.includeWaybill !== false,
-                        sale: {
-                          saleNumber: "SAMPLE",
-                          date: new Date().toISOString(),
-                          customer: {
-                            name: "Sample customer",
-                            phone: "08000000000",
-                          },
-                          paymentMethod: "cash",
-                          paymentStatus: "paid",
-                          subtotal: 3000,
-                          taxAmount: business.taxEnabled
-                            ? 3000 * (Number(business.taxRate || 0) / 100)
-                            : 0,
-                          total: business.taxEnabled
-                            ? 3000 * (1 + Number(business.taxRate || 0) / 100)
-                            : 3000,
-                          items: [
-                            {
-                              quantity: 1,
-                              unitPrice: 3000,
-                              totalPrice: 3000,
-                              product: { name: "Sample product", unit: "piece" },
+                  <div>
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="checkbox"
+                        id="includeWaybill"
+                        className="form-checkbox"
+                        checked={
+                          settings.business?.receiptSettings?.includeWaybill ??
+                          true
+                        }
+                        onChange={(e) =>
+                          handleBusinessSettingChange("settings", {
+                            receiptSettings: {
+                              ...settings.business?.receiptSettings,
+                              includeWaybill: e.target.checked,
                             },
-                          ],
-                        },
-                      });
-                    }}
-                  >
-                    <FileText className="w-4 h-4 mr-2" />
-                    Download sales invoice PDF
-                  </button>
-                  <p className="text-xs text-gray-500">
-                    Sample invoice and waybill using your business details. Sales history downloads the same PDF for a real sale.
-                  </p>
+                          })
+                        }
+                      />
+                      <label
+                        htmlFor="includeWaybill"
+                        className="text-sm font-medium text-gray-700"
+                      >
+                        Enable waybill on Sales
+                      </label>
+                    </div>
+                    <p className="text-xs text-gray-500 ml-7 mt-1">
+                      When enabled, Sales can print a waybill / goods issue note.
+                      Thermal uses the AA ERP Goods Issue Note layout (qty only).
+                    </p>
+                  </div>
+
+                  {/* Invoice settings */}
+                  {invoiceEnabled && (
+                  <div className="rounded-xl border border-gray-200 p-4 space-y-3">
+                    <h4 className="text-sm font-semibold text-gray-900">
+                      Invoice
+                    </h4>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Paper size
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {PAPER_FORMATS.map((option) => (
+                          <button
+                            key={`inv-${option.id}`}
+                            type="button"
+                            className={`btn ${
+                              invoicePrint.paperFormat === option.id
+                                ? "btn-primary"
+                                : "btn-outline"
+                            }`}
+                            onClick={() =>
+                              patchReceiptDoc("invoice", {
+                                paperFormat: option.id,
+                              })
+                            }
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {invoicePrint.paperFormat !== "thermal" ? (
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Orientation
+                          </label>
+                          <div className="grid grid-cols-2 gap-2 max-w-md">
+                            {ORIENTATIONS.map((option) => (
+                              <button
+                                key={`inv-o-${option.id}`}
+                                type="button"
+                                className={`btn ${
+                                  invoicePrint.orientation === option.id
+                                    ? "btn-primary"
+                                    : "btn-outline"
+                                }`}
+                                onClick={() =>
+                                  patchReceiptDoc("invoice", {
+                                    orientation: option.id,
+                                  })
+                                }
+                              >
+                                {option.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Color
+                          </label>
+                          <div className="grid grid-cols-2 gap-2 max-w-md">
+                            {COLOR_MODES.map((option) => (
+                              <button
+                                key={`inv-c-${option.id}`}
+                                type="button"
+                                className={`btn ${
+                                  invoicePrint.colorMode === option.id
+                                    ? "btn-primary"
+                                    : "btn-outline"
+                                }`}
+                                onClick={() =>
+                                  patchReceiptDoc("invoice", {
+                                    colorMode: option.id,
+                                  })
+                                }
+                              >
+                                {option.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-xs text-gray-500">
+                        Thermal invoice is always portrait and black &amp; white.
+                      </p>
+                    )}
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                      <p className="text-sm font-medium text-gray-700 mb-2">
+                        Invoice preview — {formatPreviewLabel(invoicePrint)}
+                      </p>
+                      {invoicePreviewUrl ? (
+                        <iframe
+                          title="Invoice preview"
+                          src={invoicePreviewUrl}
+                          className="w-full h-[480px] rounded-lg bg-white border border-gray-200"
+                        />
+                      ) : (
+                        <div className="h-[120px] flex items-center justify-center text-sm text-gray-500">
+                          Loading invoice preview…
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        className="btn btn-outline mt-3"
+                        onClick={async () => {
+                          const { printSalesInvoice } = await import(
+                            "../../utils/salesDocuments"
+                          );
+                          const business = settings.business || {};
+                          printSalesInvoice({
+                            business,
+                            format: invoicePrint.paperFormat,
+                            orientation: invoicePrint.orientation,
+                            colorMode: invoicePrint.colorMode,
+                            sale: sampleSaleForPreview(business),
+                          });
+                        }}
+                      >
+                        <FileText className="w-4 h-4 mr-2" />
+                        Print sample invoice
+                      </button>
+                    </div>
+                  </div>
+                  )}
+
+                  {/* Waybill settings */}
+                  {waybillEnabled && (
+                    <div className="rounded-xl border border-gray-200 p-4 space-y-3">
+                      <h4 className="text-sm font-semibold text-gray-900">
+                        Waybill / Goods Issue Note
+                      </h4>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Paper size
+                        </label>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          {PAPER_FORMATS.map((option) => (
+                            <button
+                              key={`wb-${option.id}`}
+                              type="button"
+                              className={`btn ${
+                                waybillPrint.paperFormat === option.id
+                                  ? "btn-primary"
+                                  : "btn-outline"
+                              }`}
+                              onClick={() =>
+                                patchReceiptDoc("waybill", {
+                                  paperFormat: option.id,
+                                })
+                              }
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      {waybillPrint.paperFormat !== "thermal" ? (
+                        <>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Orientation
+                            </label>
+                            <div className="grid grid-cols-2 gap-2 max-w-md">
+                              {ORIENTATIONS.map((option) => (
+                                <button
+                                  key={`wb-o-${option.id}`}
+                                  type="button"
+                                  className={`btn ${
+                                    waybillPrint.orientation === option.id
+                                      ? "btn-primary"
+                                      : "btn-outline"
+                                  }`}
+                                  onClick={() =>
+                                    patchReceiptDoc("waybill", {
+                                      orientation: option.id,
+                                    })
+                                  }
+                                >
+                                  {option.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Color
+                            </label>
+                            <div className="grid grid-cols-2 gap-2 max-w-md">
+                              {COLOR_MODES.map((option) => (
+                                <button
+                                  key={`wb-c-${option.id}`}
+                                  type="button"
+                                  className={`btn ${
+                                    waybillPrint.colorMode === option.id
+                                      ? "btn-primary"
+                                      : "btn-outline"
+                                  }`}
+                                  onClick={() =>
+                                    patchReceiptDoc("waybill", {
+                                      colorMode: option.id,
+                                    })
+                                  }
+                                >
+                                  {option.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-xs text-gray-500">
+                          Thermal waybill prints as a Goods Issue Note (portrait,
+                          black &amp; white, qty only).
+                        </p>
+                      )}
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                        <p className="text-sm font-medium text-gray-700 mb-2">
+                          {waybillPrint.paperFormat === "thermal"
+                            ? "Goods Issue Note preview — Thermal"
+                            : `Waybill preview — ${formatPreviewLabel(
+                                waybillPrint
+                              )}`}
+                        </p>
+                        {waybillPreviewUrl ? (
+                          <iframe
+                            title="Waybill preview"
+                            src={waybillPreviewUrl}
+                            className="w-full h-[480px] rounded-lg bg-white border border-gray-200"
+                          />
+                        ) : (
+                          <div className="h-[120px] flex items-center justify-center text-sm text-gray-500">
+                            Loading waybill preview…
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          className="btn btn-outline mt-3"
+                          onClick={async () => {
+                            const { printSalesWaybill } = await import(
+                              "../../utils/salesDocuments"
+                            );
+                            const business = settings.business || {};
+                            printSalesWaybill({
+                              business,
+                              format: waybillPrint.paperFormat,
+                              orientation: waybillPrint.orientation,
+                              colorMode: waybillPrint.colorMode,
+                              sale: sampleSaleForPreview(business),
+                            });
+                          }}
+                        >
+                          <FileText className="w-4 h-4 mr-2" />
+                          Print sample{" "}
+                          {waybillPrint.paperFormat === "thermal"
+                            ? "goods issue note"
+                            : "waybill"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -567,6 +1275,170 @@ const SettingsPage = () => {
                     />
                   </div>
                 </div>
+              </div>
+
+              <div className="card p-6">
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                      <Landmark className="w-5 h-5 text-teal-600" />
+                      Bank Accounts
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Set up receiving accounts for bank payments. Assign a
+                      default bank to each user under Preferences or Team.
+                    </p>
+                  </div>
+                </div>
+
+                {!canManageSettings && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 mb-4">
+                    Your account is <strong>{user?.role || "staff"}</strong>, so
+                    you can view banks but not add or edit them. Ask the business
+                    owner (or a manager) to set these up, or grant you{" "}
+                    <strong>settings.manage</strong> in Team.
+                  </div>
+                )}
+
+                {bankAccounts.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500 mb-4">
+                    No bank accounts yet.
+                    {canManageSettings
+                      ? " Add one to use Bank at checkout."
+                      : " An owner or manager needs to add one first."}
+                  </div>
+                ) : (
+                  <ul className="space-y-2 mb-4">
+                    {bankAccounts.map((bank) => (
+                      <li
+                        key={bank.id}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-gray-900 truncate">
+                              {bank.bankName}
+                            </p>
+                            {bank.isDefault && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-0.5 text-[11px] font-medium text-teal-700">
+                                <Star className="w-3 h-3" />
+                                Business default
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600 truncate">
+                            {bank.accountName}
+                          </p>
+                          <p className="text-sm font-mono text-gray-500">
+                            {bank.accountNumber}
+                          </p>
+                        </div>
+                        {canManageSettings && (
+                          <div className="flex items-center gap-2 shrink-0">
+                            {!bank.isDefault && (
+                              <button
+                                type="button"
+                                onClick={() => handleSetDefaultBank(bank.id)}
+                                className="text-xs font-medium text-teal-700 hover:text-teal-800 px-2 py-1 rounded-lg hover:bg-teal-50"
+                              >
+                                Make default
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingBankId(bank.id);
+                                setBankDraft({
+                                  bankName: bank.bankName,
+                                  accountName: bank.accountName,
+                                  accountNumber: bank.accountNumber,
+                                });
+                              }}
+                              className="text-xs font-medium text-gray-600 hover:text-gray-900 px-2 py-1 rounded-lg hover:bg-gray-100"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteBank(bank.id)}
+                              className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"
+                              aria-label="Delete bank"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {canManageSettings && (
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3">
+                    <p className="text-sm font-medium text-gray-800">
+                      {editingBankId ? "Edit bank account" : "Add bank account"}
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <input
+                        className="form-input"
+                        placeholder="Bank name"
+                        value={bankDraft.bankName}
+                        onChange={(e) =>
+                          setBankDraft({
+                            ...bankDraft,
+                            bankName: e.target.value,
+                          })
+                        }
+                      />
+                      <input
+                        className="form-input"
+                        placeholder="Account name"
+                        value={bankDraft.accountName}
+                        onChange={(e) =>
+                          setBankDraft({
+                            ...bankDraft,
+                            accountName: e.target.value,
+                          })
+                        }
+                      />
+                      <input
+                        className="form-input"
+                        placeholder="Account number"
+                        inputMode="numeric"
+                        value={bankDraft.accountNumber}
+                        onChange={(e) =>
+                          setBankDraft({
+                            ...bankDraft,
+                            accountNumber: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleSaveBank}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-teal-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-teal-700"
+                      >
+                        {editingBankId ? (
+                          <Save className="w-4 h-4" />
+                        ) : (
+                          <Plus className="w-4 h-4" />
+                        )}
+                        {editingBankId ? "Update bank" : "Add bank"}
+                      </button>
+                      {editingBankId && (
+                        <button
+                          type="button"
+                          onClick={resetBankForm}
+                          className="rounded-xl px-3.5 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="card p-6">
@@ -659,6 +1531,69 @@ const SettingsPage = () => {
                       <option value="MM/DD/YYYY">MM/DD/YYYY</option>
                       <option value="YYYY-MM-DD">YYYY-MM-DD</option>
                     </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="card p-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                  Sales Preferences
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Default Payment Method
+                    </label>
+                    <select
+                      className="form-select max-w-xs"
+                      value={settings.pos?.defaultPaymentMethod || "cash"}
+                      onChange={(e) =>
+                        handlePreferenceChange(
+                          "pos",
+                          "defaultPaymentMethod",
+                          e.target.value
+                        )
+                      }
+                    >
+                      <option value="cash">Cash</option>
+                      <option value="bank">Bank</option>
+                    </select>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Used when you open checkout on Sales. Applies only to your account.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Default Bank Account
+                    </label>
+                    <select
+                      className="form-select max-w-md"
+                      disabled={bankAccounts.length === 0}
+                      value={settings.pos?.defaultBankAccountId || ""}
+                      onChange={(e) =>
+                        handlePreferenceChange(
+                          "pos",
+                          "defaultBankAccountId",
+                          e.target.value || null
+                        )
+                      }
+                    >
+                      <option value="">
+                        {bankAccounts.length === 0
+                          ? "Add a bank in Business settings first"
+                          : "Use business default"}
+                      </option>
+                      {bankAccounts.map((bank) => (
+                        <option key={bank.id} value={bank.id}>
+                          {bank.bankName} · {bank.accountNumber}
+                          {bank.isDefault ? " (business default)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Pre-selected when your payment method is Bank.
+                    </p>
                   </div>
                 </div>
               </div>

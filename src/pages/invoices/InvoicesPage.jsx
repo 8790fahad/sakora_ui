@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "react-query";
 import { MessageCircle, Copy } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../../services/api";
-import { whatsappLink, copyText } from "../../utils/share";
+import { whatsappLink, copyText, orderUrl } from "../../utils/share";
 
 const InvoicesPage = () => {
   const queryClient = useQueryClient();
@@ -134,7 +134,7 @@ const InvoicesPage = () => {
             <div className="mt-3 flex gap-2">
               <button
                 onClick={() => {
-                  const url = `${window.location.origin}/shop/${shop.slug}/order/${invoice.orderNumber}`;
+                  const url = orderUrl(shop.slug, invoice.orderNumber);
                   copyText(url);
                   toast.success("Invoice link copied");
                 }}
@@ -146,7 +146,7 @@ const InvoicesPage = () => {
                 <a
                   href={whatsappLink(
                     invoice.customerPhone,
-                    `Invoice ${invoice.orderNumber}: ${window.location.origin}/shop/${shop.slug}/order/${invoice.orderNumber}`
+                    `Invoice ${invoice.orderNumber}: ${orderUrl(shop.slug, invoice.orderNumber)}`
                   )}
                   className="px-3 py-1.5 rounded-full bg-green-50 text-green-700 text-sm flex items-center gap-1"
                 >

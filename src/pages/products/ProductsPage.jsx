@@ -1,51 +1,86 @@
-import React, { useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   Package,
   Plus,
   Search,
   ChevronRight,
-  AlertTriangle,
   Trash2,
-  X,
   Loader2,
   Share2,
+  Upload,
+  Download,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "react-query";
 import { useForm } from "react-hook-form";
+import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import api from "../../services/api";
 import { productUrl, shareProductText, whatsappLink } from "../../utils/share";
+import {
+  downloadProductImportTemplate,
+  parseProductImportFile,
+} from "../../utils/productImport";
+
+const toDateInput = (value) => {
+  if (!value) return "";
+  return String(value).slice(0, 10);
+};
+
+const daysUntilExpiry = (expiryDate) => {
+  if (!expiryDate) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(`${toDateInput(expiryDate)}T00:00:00`);
+  return Math.round((target - today) / (1000 * 60 * 60 * 24));
+};
+
+const emptyForm = {
+  name: "",
+  sku: "",
+  categoryId: "",
+  costPrice: "",
+  sellingPrice: "",
+  unit: "piece",
+  lowStockThreshold: 10,
+  expiryDate: "",
+  initialStock: 0,
+  description: "",
+  isOnline: true,
+};
 
 const ProductsPage = () => {
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const stockFilter = searchParams.get("filter") || "all";
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showProductSheet, setShowProductSheet] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const importInputRef = useRef(null);
 
-  // Form setup
+  const setStockFilter = (value) => {
+    if (value === "all") {
+      const next = new URLSearchParams(searchParams);
+      next.delete("filter");
+      setSearchParams(next, { replace: true });
+      return;
+    }
+    setSearchParams({ filter: value }, { replace: true });
+  };
+
   const {
     register,
     handleSubmit,
     reset,
     watch,
-    formState: { errors },
+    setValue,
   } = useForm({
-    defaultValues: {
-      name: "",
-      sku: "",
-      categoryId: "",
-      costPrice: "",
-      sellingPrice: "",
-      unit: "piece",
-      lowStockThreshold: 10,
-      initialStock: 0,
-      description: "",
-      isOnline: true,
-    },
+    defaultValues: emptyForm,
   });
+  const [showNewCategory, setShowNewCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
 
-  // Watch prices for margin calculation
   const costPrice = watch("costPrice");
   const sellingPrice = watch("sellingPrice");
   const profitMargin =
@@ -53,7 +88,6 @@ const ProductsPage = () => {
       ? (((sellingPrice - costPrice) / sellingPrice) * 100).toFixed(1)
       : 0;
 
-  // Fetch products
   const { data: productsData, isLoading: productsLoading } = useQuery(
     ["products", { search, categoryFilter }],
     () =>
@@ -67,14 +101,19 @@ const ProductsPage = () => {
     { refetchOnWindowFocus: false }
   );
 
-  // Fetch categories
   const { data: categoriesData } = useQuery(
     "product-categories",
     () => api.products.categories(),
     { refetchOnWindowFocus: false }
   );
 
-  const { data: shopData } = useQuery("storefront-settings", api.storefront.settings, {
+  const { data: shopData } = useQuery(
+    "storefront-settings",
+    api.storefront.settings,
+    { refetchOnWindowFocus: false }
+  );
+
+  const { data: settingsData } = useQuery("settings", api.settings.get, {
     refetchOnWindowFocus: false,
   });
 
@@ -82,6 +121,8 @@ const ProductsPage = () => {
   const categories = categoriesData?.data?.categories || [];
   const shop = shopData?.data || {};
   const shopSlug = shop.slug;
+  const expiryAlertDays =
+    settingsData?.data?.business?.expiryAlertDays ?? 30;
 
   const shareProduct = async (event, product) => {
     event.stopPropagation();
@@ -94,7 +135,6 @@ const ProductsPage = () => {
     window.open(whatsappLink("", text), "_blank");
   };
 
-  // Create product mutation
   const createProductMutation = useMutation(
     (data) => api.products.create(data),
     {
@@ -111,7 +151,44 @@ const ProductsPage = () => {
     }
   );
 
-  // Update product mutation
+  const bulkImportMutation = useMutation(
+    (products) => api.products.bulkImport({ products }),
+    {
+      onSuccess: (response) => {
+        const count =
+          response?.data?.importedCount ??
+          response?.data?.imported?.length ??
+          0;
+        toast.success(`Imported ${count} product${count === 1 ? "" : "s"}`);
+        queryClient.invalidateQueries("products");
+        queryClient.invalidateQueries("product-categories");
+      },
+      // API interceptor already toasts the error message (includes first bad row)
+    }
+  );
+
+  const handleImportFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    const lower = file.name.toLowerCase();
+    if (!lower.endsWith(".xlsx") && !lower.endsWith(".xls") && !lower.endsWith(".csv")) {
+      toast.error("Please upload an Excel (.xlsx) or CSV file");
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const products = await parseProductImportFile(file);
+      await bulkImportMutation.mutateAsync(products);
+    } catch (error) {
+      toast.error(error.message || "Could not read the file");
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const updateProductMutation = useMutation(
     ({ id, data }) => api.products.update(id, data),
     {
@@ -128,7 +205,36 @@ const ProductsPage = () => {
     }
   );
 
-  // Delete product mutation
+  const createCategoryMutation = useMutation(
+    (data) => api.products.createCategory(data),
+    {
+      onSuccess: (response) => {
+        const category = response?.data?.category;
+        toast.success("Category added");
+        queryClient.invalidateQueries("product-categories");
+        if (category?.id) {
+          setValue("categoryId", category.id);
+        }
+        setNewCategoryName("");
+        setShowNewCategory(false);
+      },
+      onError: (error) => {
+        toast.error(
+          error.response?.data?.message || "Failed to add category"
+        );
+      },
+    }
+  );
+
+  const addCategory = () => {
+    const name = newCategoryName.trim();
+    if (name.length < 2) {
+      toast.error("Enter a category name");
+      return;
+    }
+    createCategoryMutation.mutate({ name });
+  };
+
   const deleteProductMutation = useMutation((id) => api.products.delete(id), {
     onSuccess: () => {
       toast.success("Product deleted!");
@@ -143,32 +249,14 @@ const ProductsPage = () => {
   const handleCloseSheet = () => {
     setShowProductSheet(false);
     setSelectedProduct(null);
-    reset({
-      name: "",
-      sku: "",
-      categoryId: "",
-      costPrice: "",
-      sellingPrice: "",
-      unit: "piece",
-      lowStockThreshold: 10,
-      initialStock: 0,
-      isOnline: true,
-    });
+    setShowNewCategory(false);
+    setNewCategoryName("");
+    reset(emptyForm);
   };
 
   const handleAddProduct = () => {
     setSelectedProduct(null);
-    reset({
-      name: "",
-      sku: "",
-      categoryId: "",
-      costPrice: "",
-      sellingPrice: "",
-      unit: "piece",
-      lowStockThreshold: 10,
-      initialStock: 0,
-      isOnline: true,
-    });
+    reset(emptyForm);
     setShowProductSheet(true);
   };
 
@@ -180,8 +268,9 @@ const ProductsPage = () => {
       categoryId: product.categoryId || "",
       costPrice: product.costPrice || "",
       sellingPrice: product.sellingPrice || "",
-      unit: product.unit || "pcs",
+      unit: product.unit || "piece",
       lowStockThreshold: product.lowStockThreshold || 10,
+      expiryDate: toDateInput(product.expiryDate),
       initialStock: product.inventory?.[0]?.quantity || 0,
       description: product.description || "",
       isOnline: product.isOnline !== false,
@@ -197,7 +286,8 @@ const ProductsPage = () => {
       costPrice: parseFloat(data.costPrice) || 0,
       sellingPrice: parseFloat(data.sellingPrice) || 0,
       unit: data.unit || "piece",
-      lowStockThreshold: parseInt(data.lowStockThreshold) || 10,
+      lowStockThreshold: parseInt(data.lowStockThreshold, 10) || 10,
+      expiryDate: data.expiryDate || null,
       openingStock: parseFloat(data.initialStock) || 0,
       description: data.description || "",
       isOnline: Boolean(data.isOnline),
@@ -219,13 +309,12 @@ const ProductsPage = () => {
     }
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat("en-NG", {
+  const formatCurrency = (amount) =>
+    new Intl.NumberFormat("en-NG", {
       style: "currency",
       currency: "NGN",
       minimumFractionDigits: 0,
     }).format(amount);
-  };
 
   const getStockStatus = (product) => {
     const inventory = product.inventory?.[0];
@@ -233,27 +322,134 @@ const ProductsPage = () => {
     const available = parseFloat(inventory.quantity || 0);
     const threshold = inventory.reorderPoint || product.lowStockThreshold || 10;
     if (available <= 0) return { status: "Out", color: "red" };
-    if (available <= threshold) return { status: "Low", color: "orange" };
+    if (available <= threshold) return { status: "Reorder", color: "orange" };
     return { status: `${available}`, color: "green" };
   };
 
+  const getExpiryStatus = (product) => {
+    const days = daysUntilExpiry(product.expiryDate);
+    if (days === null) return null;
+    if (days < 0) return { status: "Expired", color: "red" };
+    if (days <= expiryAlertDays) {
+      return {
+        status: days === 0 ? "Expires today" : `${days}d left`,
+        color: "orange",
+      };
+    }
+    return null;
+  };
+
+  const isBelowReorder = (product) => {
+    const inventory = product.inventory?.[0];
+    if (!inventory) return true;
+    const available = parseFloat(inventory.quantity || 0);
+    const threshold = inventory.reorderPoint || product.lowStockThreshold || 10;
+    return available <= threshold;
+  };
+
+  const isExpiringAlert = (product) => {
+    const days = daysUntilExpiry(product.expiryDate);
+    return days !== null && days <= expiryAlertDays;
+  };
+
+  const filteredProducts = useMemo(() => {
+    if (stockFilter === "reorder" || stockFilter === "low") {
+      return products.filter(isBelowReorder);
+    }
+    if (stockFilter === "expiring") {
+      return products.filter(isExpiringAlert);
+    }
+    return products;
+  }, [products, stockFilter, expiryAlertDays]);
+
+  const filterButtons = [
+    { key: "all", label: "All" },
+    { key: "reorder", label: "Reorder" },
+    { key: "expiring", label: "Expiring" },
+  ];
+
+  const badgeClass = (color) =>
+    color === "green"
+      ? "bg-green-100 text-green-700"
+      : color === "orange"
+      ? "bg-orange-100 text-orange-700"
+      : color === "red"
+      ? "bg-red-100 text-red-700"
+      : "bg-gray-100 text-gray-600";
+
   return (
     <div className="pb-4">
-      {/* Search Bar */}
       <div className="px-4 py-3 bg-[var(--ios-bg-grouped)]">
-        <div className="ios-search-input-wrapper">
-          <Search className="ios-search-icon" />
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <div className="ios-search-input-wrapper flex-1 min-w-[180px]">
+            <Search className="ios-search-icon" />
+            <input
+              type="search"
+              placeholder="Search products..."
+              className="ios-search-input"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
           <input
-            type="search"
-            placeholder="Search products..."
-            className="ios-search-input"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            ref={importInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
+            className="hidden"
+            onChange={handleImportFile}
           />
+          <button
+            type="button"
+            onClick={() => downloadProductImportTemplate()}
+            className="ios-btn ios-btn-secondary whitespace-nowrap flex-shrink-0"
+            title="Download Excel template"
+          >
+            <Download className="w-4 h-4 mr-1.5" />
+            Template
+          </button>
+          <button
+            type="button"
+            onClick={() => importInputRef.current?.click()}
+            disabled={importing || bulkImportMutation.isLoading}
+            className="ios-btn ios-btn-secondary whitespace-nowrap flex-shrink-0"
+          >
+            {importing || bulkImportMutation.isLoading ? (
+              <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+            ) : (
+              <Upload className="w-4 h-4 mr-1.5" />
+            )}
+            Import Excel
+          </button>
+          <button
+            type="button"
+            onClick={handleAddProduct}
+            className="ios-btn ios-btn-primary whitespace-nowrap flex-shrink-0"
+          >
+            <Plus className="w-4 h-4 mr-1.5" />
+            New Product
+          </button>
         </div>
       </div>
 
-      {/* Category Filter */}
+      <div className="px-4 pb-2 overflow-x-auto scrollbar-hide">
+        <div className="flex gap-2">
+          {filterButtons.map((btn) => (
+            <button
+              key={btn.key}
+              onClick={() => setStockFilter(btn.key)}
+              className={`ios-btn-sm whitespace-nowrap ${
+                stockFilter === btn.key ||
+                (btn.key === "reorder" && stockFilter === "low")
+                  ? "bg-teal-600 text-white"
+                  : "bg-[var(--ios-gray-5)] text-[var(--ios-text-primary)]"
+              }`}
+            >
+              {btn.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="px-4 pb-3 overflow-x-auto scrollbar-hide">
         <div className="flex gap-2">
           <button
@@ -264,7 +460,7 @@ const ProductsPage = () => {
                 : "bg-[var(--ios-gray-5)] text-[var(--ios-text-primary)]"
             }`}
           >
-            All
+            All categories
           </button>
           {categories.map((cat) => (
             <button
@@ -279,37 +475,79 @@ const ProductsPage = () => {
               {cat.name}
             </button>
           ))}
+          {showNewCategory && !showProductSheet ? (
+            <div className="flex items-center gap-1">
+              <input
+                autoFocus
+                type="text"
+                className="ios-btn-sm bg-white border border-[var(--ios-gray-4)] min-w-[140px]"
+                placeholder="New category"
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addCategory();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="ios-btn-sm bg-teal-600 text-white"
+                onClick={addCategory}
+                disabled={createCategoryMutation.isLoading}
+              >
+                Save
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setShowNewCategory(true);
+                setNewCategoryName("");
+              }}
+              className="ios-btn-sm whitespace-nowrap bg-[var(--ios-gray-5)] text-teal-700"
+            >
+              <Plus className="w-3.5 h-3.5 mr-1" />
+              Add
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Products List */}
       {productsLoading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 animate-spin text-[var(--ios-blue)]" />
         </div>
-      ) : products.length === 0 ? (
+      ) : filteredProducts.length === 0 ? (
         <div className="ios-empty-state">
           <Package className="ios-empty-state-icon" />
           <h3 className="ios-empty-state-title">No Products</h3>
           <p className="ios-empty-state-message">
-            {search
-              ? "No products match your search"
+            {search || stockFilter !== "all"
+              ? "No products match your filters"
               : "Add your first product to get started"}
           </p>
-          <button
-            onClick={handleAddProduct}
-            className="ios-btn ios-btn-primary"
-          >
-            <Plus className="w-5 h-5 mr-2" />
-            Add Product
-          </button>
+          {stockFilter === "all" && !search && (
+            <button
+              onClick={handleAddProduct}
+              className="ios-btn ios-btn-primary"
+            >
+              <Plus className="w-5 h-5 mr-2" />
+              Add Product
+            </button>
+          )}
         </div>
       ) : (
         <div className="ios-section">
-          <p className="ios-section-header">{products.length} Products</p>
+          <p className="ios-section-header">
+            {filteredProducts.length} Products
+          </p>
           <div className="ios-list mx-4">
-            {products.map((product) => {
+            {filteredProducts.map((product) => {
               const stockStatus = getStockStatus(product);
+              const expiryStatus = getExpiryStatus(product);
               return (
                 <div key={product.id} className="ios-list-item w-full text-left">
                   <button
@@ -329,23 +567,28 @@ const ProductsPage = () => {
                       )}
                     </div>
                     <div className="flex-1 min-w-0 py-2">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <p className="text-[17px] font-medium truncate pr-2">
                           {product.name}
                         </p>
-                        <span
-                          className={`text-[13px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${
-                            stockStatus.color === "green"
-                              ? "bg-green-100 text-green-700"
-                              : stockStatus.color === "orange"
-                              ? "bg-orange-100 text-orange-700"
-                              : stockStatus.color === "red"
-                              ? "bg-red-100 text-red-700"
-                              : "bg-gray-100 text-gray-600"
-                          }`}
-                        >
-                          {stockStatus.status}
-                        </span>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          {expiryStatus && (
+                            <span
+                              className={`text-[12px] font-medium px-2 py-0.5 rounded-full ${badgeClass(
+                                expiryStatus.color
+                              )}`}
+                            >
+                              {expiryStatus.status}
+                            </span>
+                          )}
+                          <span
+                            className={`text-[13px] font-medium px-2 py-0.5 rounded-full ${badgeClass(
+                              stockStatus.color
+                            )}`}
+                          >
+                            {stockStatus.status}
+                          </span>
+                        </div>
                       </div>
                       <div className="flex items-center justify-between mt-1">
                         <p className="text-[15px] text-[var(--ios-gray-1)]">
@@ -381,7 +624,6 @@ const ProductsPage = () => {
         </div>
       )}
 
-      {/* Add Product FAB - only show when not empty */}
       {products.length > 0 && (
         <button
           onClick={handleAddProduct}
@@ -392,14 +634,12 @@ const ProductsPage = () => {
         </button>
       )}
 
-      {/* Product Sheet (iOS Bottom Sheet) */}
       {showProductSheet && (
         <>
           <div className="ios-sheet-overlay" onClick={handleCloseSheet} />
           <div className="ios-sheet" style={{ maxHeight: "95vh" }}>
             <div className="ios-sheet-handle" />
 
-            {/* Sheet Header */}
             <div className="ios-sheet-header">
               <button
                 onClick={handleCloseSheet}
@@ -427,10 +667,8 @@ const ProductsPage = () => {
               </button>
             </div>
 
-            {/* Sheet Content */}
             <div className="ios-sheet-content px-4 pb-8">
               <form onSubmit={handleSubmit(onSubmit)}>
-                {/* Product Name */}
                 <div className="ios-section">
                   <p className="ios-section-header">Product Details</p>
                   <div className="ios-list mx-0">
@@ -466,10 +704,63 @@ const ProductsPage = () => {
                         ))}
                       </select>
                     </div>
+                    {showNewCategory ? (
+                      <div className="ios-input-wrapper">
+                        <label className="ios-input-label">New category</label>
+                        <div className="flex items-center gap-2 w-full">
+                          <input
+                            autoFocus
+                            type="text"
+                            className="ios-input"
+                            placeholder="e.g. Household"
+                            value={newCategoryName}
+                            onChange={(e) => setNewCategoryName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                addCategory();
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="text-[15px] font-semibold text-[var(--ios-blue)] flex-shrink-0"
+                            onClick={addCategory}
+                            disabled={createCategoryMutation.isLoading}
+                          >
+                            {createCategoryMutation.isLoading ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              "Add"
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            className="text-[15px] text-[var(--ios-gray-1)] flex-shrink-0"
+                            onClick={() => {
+                              setShowNewCategory(false);
+                              setNewCategoryName("");
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="w-full flex items-center justify-between px-4 py-3 text-[15px] text-[var(--ios-blue)]"
+                        onClick={() => setShowNewCategory(true)}
+                      >
+                        <span className="flex items-center">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add category
+                        </span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                {/* Pricing */}
                 <div className="ios-section">
                   <p className="ios-section-header">Pricing</p>
                   <div className="ios-list mx-0">
@@ -502,7 +793,6 @@ const ProductsPage = () => {
                   )}
                 </div>
 
-                {/* Inventory */}
                 <div className="ios-section">
                   <p className="ios-section-header">Inventory</p>
                   <div className="ios-list mx-0">
@@ -524,12 +814,21 @@ const ProductsPage = () => {
                       </select>
                     </div>
                     <div className="ios-input-wrapper">
-                      <label className="ios-input-label">Low Stock Alert</label>
+                      <label className="ios-input-label">Reorder level</label>
                       <input
                         type="number"
+                        min="0"
                         className="ios-input"
                         placeholder="10"
                         {...register("lowStockThreshold")}
+                      />
+                    </div>
+                    <div className="ios-input-wrapper">
+                      <label className="ios-input-label">Expiry date</label>
+                      <input
+                        type="date"
+                        className="ios-input"
+                        {...register("expiryDate")}
                       />
                     </div>
                     {!selectedProduct && (
@@ -544,9 +843,12 @@ const ProductsPage = () => {
                       </div>
                     )}
                   </div>
+                  <p className="ios-section-footer">
+                    Alert when stock hits reorder level, or when expiry is within{" "}
+                    {expiryAlertDays} days.
+                  </p>
                 </div>
 
-                {/* Description */}
                 <div className="ios-section">
                   <p className="ios-section-header">Description (Optional)</p>
                   <textarea
@@ -565,7 +867,6 @@ const ProductsPage = () => {
                   </label>
                 </div>
 
-                {/* Delete Button */}
                 {selectedProduct && (
                   <div className="ios-section">
                     <button

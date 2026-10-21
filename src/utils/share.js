@@ -1,8 +1,25 @@
-export const shopUrl = (slug) =>
-  `${window.location.origin}/shop/${slug}`;
+/** Customer shops on the website: https://sakora.shop/{businessSlug} */
+const STOREFRONT_ORIGIN = (
+  import.meta.env.VITE_STOREFRONT_URL || "http://localhost:5174"
+).replace(/\/$/, "");
+
+/** Public shop URL: https://sakora.shop/{businessSlug} */
+export const shopUrl = (slug) => `${STOREFRONT_ORIGIN}/${slug}`;
 
 export const productUrl = (slug, productId) =>
-  `${window.location.origin}/shop/${slug}?product=${productId}`;
+  `${STOREFRONT_ORIGIN}/${slug}?product=${productId}`;
+
+/** Order + payment verification: https://sakora.shop/{slug}/{orderNumber} */
+export const orderUrl = (slug, orderNumber) =>
+  `${STOREFRONT_ORIGIN}/${slug}/${orderNumber}`;
+
+export const trackOrderUrl = (slug = "", orderNumber = "") => {
+  const params = new URLSearchParams();
+  if (slug) params.set("shop", slug);
+  if (orderNumber) params.set("order", orderNumber);
+  const query = params.toString();
+  return `${STOREFRONT_ORIGIN}/track${query ? `?${query}` : ""}`;
+};
 
 export const toWhatsAppNumber = (phone) => {
   const digits = String(phone || "").replace(/\D/g, "");

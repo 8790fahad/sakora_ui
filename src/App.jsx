@@ -11,20 +11,16 @@ import { useDispatch, useSelector } from "react-redux";
 import AuthLayout from "./components/layouts/AuthLayout";
 import DashboardLayout from "./components/layouts/DashboardLayout";
 import LoadingScreen from "./components/ui/LoadingScreen";
-import OfflineIndicator from "./components/ui/OfflineIndicator";
-import OfflineStatus from "./components/offline/OfflineStatus";
-import ErrorBoundary from "./components/ui/ErrorBoundary";
 import {
   selectIsAuthenticated,
   selectAuthLoading,
   setTokenFromStorage,
 } from "./store/slices/authSlice";
-import { setOnlineStatus } from "./store/slices/syncSlice";
 import { setTheme } from "./store/slices/uiSlice";
-import { initializeOffline, syncManager } from "./utils/offline";
 
 const LoginPage = lazy(() => import("./pages/auth/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/auth/RegisterPage"));
+const ForgotPasswordPage = lazy(() => import("./pages/auth/ForgotPasswordPage"));
 const DashboardPage = lazy(() => import("./pages/dashboard/DashboardPage"));
 const ProductsPage = lazy(() => import("./pages/products/ProductsPage"));
 const SalesPage = lazy(() => import("./pages/sales/SalesPage"));
@@ -38,15 +34,15 @@ const VatPage = lazy(() => import("./pages/vat/VatPage"));
 const SettingsPage = lazy(() => import("./pages/settings/SettingsPage"));
 const ProfilePage = lazy(() => import("./pages/profile/ProfilePage"));
 const NotFoundPage = lazy(() => import("./pages/errors/NotFoundPage"));
-const StorePage = lazy(() => import("./pages/storefront/StorePage"));
-const OrderStatusPage = lazy(() => import("./pages/storefront/OrderStatusPage"));
 const StorefrontSettingsPage = lazy(() => import("./pages/storefront/StorefrontSettingsPage"));
 const OrdersPage = lazy(() => import("./pages/orders/OrdersPage"));
 const TeamPage = lazy(() => import("./pages/team/TeamPage"));
 const BillingPage = lazy(() => import("./pages/billing/BillingPage"));
+const ReferralsPage = lazy(() => import("./pages/referrals/ReferralsPage"));
 const InvoicesPage = lazy(() => import("./pages/invoices/InvoicesPage"));
 const LegalPage = lazy(() => import("./pages/legal/LegalPage"));
-const LandingPage = lazy(() => import("./pages/landing/LandingPage"));
+const SupportPage = lazy(() => import("./pages/support/SupportPage"));
+const TrackOrderPage = lazy(() => import("./pages/track/TrackOrderPage"));
 
 function RouteFallback() {
   return (
@@ -78,13 +74,6 @@ function App() {
       }
     }
 
-    // Set up online/offline listeners
-    const handleOnline = () => dispatch(setOnlineStatus(true));
-    const handleOffline = () => dispatch(setOnlineStatus(false));
-
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-
     // Apply theme
     const storedTheme = localStorage.getItem("sakora_theme");
     if (storedTheme) {
@@ -111,26 +100,7 @@ function App() {
     };
     mediaQuery.addEventListener("change", handleThemeChange);
 
-    // Initialize offline capabilities
-    initializeOffline().then((success) => {
-      if (success) {
-        console.log("Offline capabilities initialized successfully");
-
-        // Set up sync manager callbacks
-        syncManager.onSync((event) => {
-          if (event.type === "success") {
-            console.log("Data synced successfully");
-          }
-        });
-      } else {
-        console.warn("Failed to initialize offline capabilities");
-      }
-    });
-
-    // Cleanup
     return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
       mediaQuery.removeEventListener("change", handleThemeChange);
     };
   }, [dispatch]);
@@ -168,12 +138,6 @@ function App() {
   return (
     <Router>
       <div className="App min-h-screen bg-gray-50 dark:bg-gray-900">
-        {/* Offline indicator */}
-        <ErrorBoundary>
-          <OfflineIndicator />
-          <OfflineStatus />
-        </ErrorBoundary>
-
         <Suspense fallback={<RouteFallback />}>
         <Routes>
           {/* Public routes */}
@@ -192,20 +156,26 @@ function App() {
             path="/register"
             element={
               <PublicRoute>
-                <AuthLayout>
+                <AuthLayout wide>
                   <RegisterPage />
                 </AuthLayout>
               </PublicRoute>
             }
           />
 
-          <Route path="/legal/:slug" element={<LegalPage />} />
-
-          <Route path="/shop/:slug" element={<StorePage />} />
           <Route
-            path="/shop/:slug/order/:orderNumber"
-            element={<OrderStatusPage />}
+            path="/forgot-password"
+            element={
+              <PublicRoute>
+                <AuthLayout>
+                  <ForgotPasswordPage />
+                </AuthLayout>
+              </PublicRoute>
+            }
           />
+
+          <Route path="/legal/:slug" element={<LegalPage />} />
+          <Route path="/track" element={<TrackOrderPage />} />
 
           {/* Protected routes */}
           <Route
@@ -297,6 +267,17 @@ function App() {
           />
 
           <Route
+            path="/referrals"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <ReferralsPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/purchases"
             element={
               <ProtectedRoute>
@@ -374,6 +355,17 @@ function App() {
           />
 
           <Route
+            path="/support"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <SupportPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/settings"
             element={
               <ProtectedRoute>
@@ -398,11 +390,7 @@ function App() {
           <Route
             path="/"
             element={
-              isAuthenticated ? (
-                <Navigate to="/dashboard" replace />
-              ) : (
-                <LandingPage />
-              )
+              <Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />
             }
           />
 
