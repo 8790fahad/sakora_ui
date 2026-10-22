@@ -10,10 +10,8 @@ import { useDispatch, useSelector } from "react-redux";
 // Import components
 import AuthLayout from "./components/layouts/AuthLayout";
 import DashboardLayout from "./components/layouts/DashboardLayout";
-import LoadingScreen from "./components/ui/LoadingScreen";
 import {
   selectIsAuthenticated,
-  selectAuthLoading,
   setTokenFromStorage,
 } from "./store/slices/authSlice";
 import { setTheme } from "./store/slices/uiSlice";
@@ -40,6 +38,7 @@ const TeamPage = lazy(() => import("./pages/team/TeamPage"));
 const BillingPage = lazy(() => import("./pages/billing/BillingPage"));
 const ReferralsPage = lazy(() => import("./pages/referrals/ReferralsPage"));
 const InvoicesPage = lazy(() => import("./pages/invoices/InvoicesPage"));
+const QuotationsPage = lazy(() => import("./pages/quotations/QuotationsPage"));
 const LegalPage = lazy(() => import("./pages/legal/LegalPage"));
 const SupportPage = lazy(() => import("./pages/support/SupportPage"));
 const TrackOrderPage = lazy(() => import("./pages/track/TrackOrderPage"));
@@ -55,7 +54,6 @@ function RouteFallback() {
 function App() {
   const dispatch = useDispatch();
   const isAuthenticated = useSelector(selectIsAuthenticated);
-  const isAuthLoading = useSelector(selectAuthLoading);
 
   // Initialize app
   useEffect(() => {
@@ -129,11 +127,6 @@ function App() {
     }
     return children;
   };
-
-  // Show loading screen during initial authentication check
-  if (isAuthLoading) {
-    return <LoadingScreen />;
-  }
 
   return (
     <Router>
@@ -228,6 +221,17 @@ function App() {
               <ProtectedRoute>
                 <DashboardLayout>
                   <InvoicesPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/quotations"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <QuotationsPage />
                 </DashboardLayout>
               </ProtectedRoute>
             }

@@ -67,6 +67,10 @@ api.interceptors.request.use(
     config.headers["X-Request-ID"] =
       Date.now().toString() + Math.random().toString(36).substr(2, 9);
 
+    if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+      delete config.headers["Content-Type"];
+    }
+
     return config;
   },
   (error) => {
@@ -86,7 +90,9 @@ api.interceptors.response.use(
 
     // Handle network errors
     if (!error.response) {
-      toast.error("Network error. Please check your connection and try again.");
+      toast.error("Network error. Please check your connection and try again.", {
+        id: "network-error",
+      });
       return Promise.reject({
         message: "Network error",
         type: "NETWORK_ERROR",
@@ -237,6 +243,11 @@ const apiMethods = {
     get: (id) => api.get(`/products/${id}`),
     create: (data) => api.post("/products", data),
     update: (id, data) => api.put(`/products/${id}`, data),
+    uploadImages: (files) => {
+      const formData = new FormData();
+      files.forEach((file) => formData.append("images", file));
+      return api.post("/products/images", formData);
+    },
     delete: (id) => api.delete(`/products/${id}`),
     bulkImport: (data) => api.post("/products/bulk-import", data),
     categories: () => api.get("/products/categories/list"),
@@ -263,6 +274,13 @@ const apiMethods = {
     delete: (id) => api.delete(`/sales/${id}`),
     receipt: (id) => api.get(`/sales/${id}/receipt`),
     stats: (params = {}) => api.get("/sales/stats", { params }),
+  },
+
+  quotations: {
+    list: (params = {}) => api.get("/quotations", { params }),
+    get: (id) => api.get(`/quotations/${id}`),
+    create: (data) => api.post("/quotations", data),
+    cancel: (id) => api.post(`/quotations/${id}/cancel`),
   },
 
   // Purchases
@@ -377,8 +395,8 @@ const apiMethods = {
 
   subscriptions: {
     plans: () => api.get("/subscriptions/plans"),
-    checkout: (plan, interval = "month") =>
-      api.post("/subscriptions/checkout", { plan, interval }),
+    checkout: (plan, interval = "month", callbackUrl) =>
+      api.post("/subscriptions/checkout", { plan, interval, callbackUrl }),
     verify: (data) => api.post("/subscriptions/verify", data),
     cancel: () => api.post("/subscriptions/cancel"),
   },

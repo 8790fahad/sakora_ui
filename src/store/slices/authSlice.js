@@ -79,13 +79,17 @@ export const resendVerification = createAsyncThunk(
 
 export const googleAuth = createAsyncThunk(
   'auth/google',
-  async ({ idToken, businessName, marketingOptIn, referralCode }, { rejectWithValue }) => {
+  async ({ idToken, businessName, marketingOptIn, referralCode, phones, description, registrationNumber, logo }, { rejectWithValue }) => {
     try {
       const response = await api.post('/auth/google', {
         idToken,
         businessName,
         marketingOptIn,
         referralCode,
+        phones,
+        description,
+        registrationNumber,
+        logo,
       })
       api.setToken(response.data.token)
       return response.data
@@ -291,29 +295,22 @@ const authSlice = createSlice({
         localStorage.removeItem('sakora_user')
       })
 
-      // Fetch Profile
-      .addCase(fetchUserProfile.pending, (state) => {
-        state.isLoading = true
-      })
+      // Fetch Profile — do not toggle isLoading. That flag unmounts the app
+      // into the startup screen, which mounts Profile again and refetches.
       .addCase(fetchUserProfile.fulfilled, (state, action) => {
-        state.isLoading = false
         state.user = action.payload
         if (action.payload) {
           localStorage.setItem('sakora_user', JSON.stringify(action.payload))
         }
       })
       .addCase(fetchUserProfile.rejected, (state, action) => {
-        state.isLoading = false
         state.error = action.payload
       })
 
-      // Update Profile
       .addCase(updateUserProfile.pending, (state) => {
-        state.isLoading = true
         state.error = null
       })
       .addCase(updateUserProfile.fulfilled, (state, action) => {
-        state.isLoading = false
         state.user = action.payload
         state.error = null
         if (action.payload) {
@@ -321,21 +318,16 @@ const authSlice = createSlice({
         }
       })
       .addCase(updateUserProfile.rejected, (state, action) => {
-        state.isLoading = false
         state.error = action.payload
       })
 
-      // Change Password
       .addCase(changePassword.pending, (state) => {
-        state.isLoading = true
         state.error = null
       })
       .addCase(changePassword.fulfilled, (state) => {
-        state.isLoading = false
         state.error = null
       })
       .addCase(changePassword.rejected, (state, action) => {
-        state.isLoading = false
         state.error = action.payload
       })
   },

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "react-query";
 import { useSearchParams } from "react-router-dom";
 import { CreditCard, Check } from "lucide-react";
@@ -8,8 +8,10 @@ import { openSquadCheckout } from "../../utils/squadCheckout";
 
 const BillingPage = () => {
   const queryClient = useQueryClient();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const [interval, setInterval] = useState("month");
+  const [checkingPayment, setCheckingPayment] = useState(false);
+  const checkedRef = useRef("");
   const { data, isLoading } = useQuery("billing-plans", api.subscriptions.plans);
   const plans = data?.data?.plans || [];
   const current = data?.data?.current || {};
@@ -17,10 +19,18 @@ const BillingPage = () => {
 
   const checkout = useMutation(
     ({ plan, interval: nextInterval }) =>
-      api.subscriptions.checkout(plan, nextInterval),
+      api.subscriptions.checkout(
+        plan,
+        nextInterval,
+        `${window.location.origin}/billing`
+      ),
     {
       onSuccess: async (response) => {
-        const payment = response.data.payment;
+        const payment = response?.data?.payment;
+        if (!payment) {
+          toast.error("Squad did not return a checkout link");
+          return;
+        }
         if (payment.mock) {
           await api.subscriptions.verify({
             reference: payment.reference,
@@ -28,6 +38,10 @@ const BillingPage = () => {
           });
           toast.success("Subscription activated");
           queryClient.invalidateQueries("billing-plans");
+          return;
+        }
+        if (payment.checkoutUrl) {
+          window.location.assign(payment.checkoutUrl);
           return;
         }
         if (payment.publicKey) {
@@ -41,14 +55,10 @@ const BillingPage = () => {
             callbackUrl: `${window.location.origin}/billing?ref=${payment.reference}`,
           });
           if (result.success) {
-            await api.subscriptions.verify({ reference: payment.reference });
-            toast.success("Squad payment confirmed");
-            queryClient.invalidateQueries("billing-plans");
+            await confirmPayment(payment.reference);
+          } else if (result.closed) {
+            toast("Payment was not completed");
           }
-          return;
-        }
-        if (payment.checkoutUrl) {
-          window.location.href = payment.checkoutUrl;
         }
       },
     }
@@ -61,17 +71,42 @@ const BillingPage = () => {
     },
   });
 
+  const confirmPayment = async (reference, mock = false) => {
+    setCheckingPayment(true);
+    try {
+      const response = await api.subscriptions.verify({
+        reference,
+        mock,
+      });
+      if (response?.data?.pending) {
+        toast("Payment is still pending. Finish it on Squad, then come back.");
+        return;
+      }
+      toast.success(
+        response?.data?.alreadyActive
+          ? "This plan is already active"
+          : "Squad payment confirmed"
+      );
+      queryClient.invalidateQueries("billing-plans");
+      setParams({}, { replace: true });
+    } catch (error) {
+      toast.error(error.message || "Could not confirm the Squad payment");
+    } finally {
+      setCheckingPayment(false);
+    }
+  };
+
   useEffect(() => {
-    const ref = params.get("ref");
-    if (!ref) return;
-    api.subscriptions
-      .verify({ reference: ref, mock: params.get("mock") === "1" })
-      .then(() => {
-        toast.success("Squad payment confirmed");
-        queryClient.invalidateQueries("billing-plans");
-      })
-      .catch(() => {});
-  }, [params, queryClient]);
+    const ref =
+      params.get("ref") ||
+      params.get("transaction_ref") ||
+      params.get("reference");
+    if (!ref || checkedRef.current === ref) return;
+    checkedRef.current = ref;
+    confirmPayment(ref, params.get("mock") === "1");
+    // confirmPayment identity changes each render; the ref guard runs this once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
 
   const priceFor = (plan) =>
     interval === "year" ? plan.yearlyPrice || plan.price * 10 : plan.price;
@@ -85,6 +120,12 @@ const BillingPage = () => {
           ? " Live/sandbox keys detected."
           : " Using local test checkout until Squad keys are added."}
       </p>
+
+      {checkingPayment && (
+        <div className="mb-4 bg-white border rounded-2xl p-4 text-sm text-slate-600">
+          Confirming your Squad payment...
+        </div>
+      )}
 
       <div className="mb-6 bg-teal-50 border border-teal-100 rounded-2xl p-4">
         Current plan:{" "}
@@ -169,10 +210,13 @@ const BillingPage = () => {
                   onClick={() =>
                     checkout.mutate({ plan: plan.key, interval })
                   }
-                  className="w-full py-2 rounded-xl bg-teal-600 text-white flex items-center justify-center gap-2"
+                  disabled={checkout.isLoading}
+                  className="w-full py-2 rounded-xl bg-teal-600 text-white flex items-center justify-center gap-2 disabled:opacity-60"
                 >
                   <CreditCard className="w-4 h-4" />
-                  Pay with Squad
+                  {checkout.isLoading && checkout.variables?.plan === plan.key
+                    ? "Opening Squad..."
+                    : "Pay with Squad"}
                 </button>
               )}
             </div>

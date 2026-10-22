@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Settings,
   Building2,
@@ -44,13 +44,15 @@ import {
 const emptyProfile = {
   name: "",
   businessType: "retail",
-  phone: "",
+  phones: [""],
   email: "",
   website: "",
   address: "",
   city: "",
   state: "",
   description: "",
+  registrationNumber: "",
+  logo: "",
 };
 
 const emptyBankDraft = {
@@ -69,10 +71,15 @@ const SettingsPage = () => {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState("");
   const [profileDraft, setProfileDraft] = useState(emptyProfile);
+  const [logoRemoved, setLogoRemoved] = useState(false);
+  const profileDirty = useRef(false);
+  const logoInputRef = useRef(null);
   const [bankDraft, setBankDraft] = useState(emptyBankDraft);
   const [editingBankId, setEditingBankId] = useState(null);
   const [invoicePreviewUrl, setInvoicePreviewUrl] = useState("");
   const [waybillPreviewUrl, setWaybillPreviewUrl] = useState("");
+  const [footerDraft, setFooterDraft] = useState(null);
+  const [waybillFooterDraft, setWaybillFooterDraft] = useState(null);
 
   const queryClient = useQueryClient();
 
@@ -83,6 +90,8 @@ const SettingsPage = () => {
     refetch: refetchSettings,
   } = useQuery("settings", api.settings.get, {
     refetchOnWindowFocus: false,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   // Fetch system info
@@ -95,6 +104,11 @@ const SettingsPage = () => {
   );
 
   const settings = settingsData?.data || {};
+  const savedFooter = settings.business?.receiptSettings?.footerText ?? "";
+  const footerText = footerDraft ?? savedFooter;
+  const savedWaybillFooter =
+    settings.business?.receiptSettings?.waybillFooterText ?? "";
+  const waybillFooterText = waybillFooterDraft ?? savedWaybillFooter;
   const invoicePrint = getDocPrintSettings(settings.business, "invoice");
   const waybillPrint = getDocPrintSettings(settings.business, "waybill");
   const invoiceEnabled =
@@ -108,7 +122,8 @@ const SettingsPage = () => {
   const sampleSaleForPreview = (business) => ({
     saleNumber: "SAMPLE",
     date: new Date().toISOString(),
-    customer: { name: "Sample customer", phone: "08000000000" },
+    customer: { name: "Sample customer", phone: "08000000000", code: "CUS-0001" },
+    cashierName: "Staff",
     paymentMethod: "cash",
     paymentStatus: "paid",
     subtotal: 3000,
@@ -161,22 +176,119 @@ const SettingsPage = () => {
 
   useEffect(() => {
     if (!settings.business) return;
-    setProfileDraft({
+    if (profileDirty.current) return;
+    const savedPhones = [
+      ...(Array.isArray(settings.business.phones) ? settings.business.phones : []),
+      settings.business.phone,
+      settings.profile?.phone,
+    ]
+      .flatMap((phone) => String(phone || "").split(/[\n,;/|]+/))
+      .map((phone) => phone.trim())
+      .filter((phone, index, all) => phone && all.indexOf(phone) === index);
+    let remembered = {};
+    try {
+      remembered = JSON.parse(
+        sessionStorage.getItem(`sakora-profile-place-${settings.business.id}`) ||
+          "{}"
+      );
+    } catch {
+      remembered = {};
+    }
+    setProfileDraft((prev) => ({
       name: settings.business.name || "",
       businessType: settings.business.businessType || "retail",
-      phone: settings.business.phone || "",
-      email: settings.business.email || "",
+      phones: savedPhones.length ? savedPhones : [""],
+      email: settings.business.email || settings.profile?.email || "",
       website: settings.business.website || "",
-      address: settings.business.address || "",
-      city: settings.business.city || "",
-      state: settings.business.state || "",
+      address:
+        settings.business.address || remembered.address || prev?.address || "",
+      city: settings.business.city || remembered.city || prev?.city || "",
+      state: settings.business.state || remembered.state || prev?.state || "",
       description: settings.business.description || "",
-    });
-  }, [settings.business]);
+      registrationNumber:
+        settings.business.registrationNumber ||
+        settings.business.registration_number ||
+        "",
+      logo: settings.business.logo || prev?.logo || "",
+    }));
+  }, [settings.business, settings.profile]);
+
+  const readLogoFile = (file) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Choose an image file");
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const max = 512;
+      const scale = Math.min(1, max / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(img.width * scale));
+      canvas.height = Math.max(1, Math.round(img.height * scale));
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      setProfileDraft((prev) => ({
+        ...prev,
+        logo: canvas.toDataURL("image/jpeg", 0.85),
+      }));
+      setLogoRemoved(false);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      toast.error("Could not read that image");
+    };
+    img.src = url;
+  };
+
+  useEffect(() => {
+    if (!settings.business?.id) return;
+    const place = {
+      address: String(profileDraft.address || "").trim(),
+      city: String(profileDraft.city || "").trim(),
+      state: String(profileDraft.state || "").trim(),
+    };
+    if (!place.address && !place.city && !place.state) return;
+    sessionStorage.setItem(
+      `sakora-profile-place-${settings.business.id}`,
+      JSON.stringify(place)
+    );
+  }, [
+    settings.business?.id,
+    profileDraft.address,
+    profileDraft.city,
+    profileDraft.state,
+  ]);
 
   useEffect(() => {
     const business = settings.business;
     if (!business) return undefined;
+    const draftPhones = (profileDraft.phones || [])
+      .map((phone) => String(phone || "").trim())
+      .filter(Boolean);
+    const previewBusiness = {
+      ...business,
+      name: profileDraft.name || business.name,
+      description: profileDraft.description || business.description,
+      address: profileDraft.address || business.address,
+      city: profileDraft.city || business.city,
+      state: profileDraft.state || business.state,
+      email: profileDraft.email || business.email,
+      registrationNumber:
+        profileDraft.registrationNumber || business.registrationNumber,
+      logo: profileDraft.logo || business.logo,
+      phones: draftPhones.length ? draftPhones : business.phones,
+      phone: draftPhones[0] || business.phone,
+      receiptSettings: {
+        ...(business.receiptSettings || {}),
+        footerText,
+        waybillFooterText,
+      },
+    };
 
     let cancelled = false;
     (async () => {
@@ -185,11 +297,11 @@ const SettingsPage = () => {
       );
       if (cancelled) return;
 
-      const sampleSale = sampleSaleForPreview(business);
+      const sampleSale = sampleSaleForPreview(previewBusiness);
       if (invoiceEnabled) {
         setInvoicePreviewUrl(
           getSalesInvoiceBlobUrl({
-            business,
+            business: previewBusiness,
             sale: sampleSale,
             format: invoicePrint.paperFormat,
             orientation: invoicePrint.orientation,
@@ -203,7 +315,7 @@ const SettingsPage = () => {
       if (waybillEnabled) {
         setWaybillPreviewUrl(
           getSalesWaybillBlobUrl({
-            business,
+            business: previewBusiness,
             sale: sampleSale,
             format: waybillPrint.paperFormat,
             orientation: waybillPrint.orientation,
@@ -220,6 +332,7 @@ const SettingsPage = () => {
     };
   }, [
     settings.business,
+    profileDraft,
     invoicePrint.paperFormat,
     invoicePrint.orientation,
     invoicePrint.colorMode,
@@ -228,11 +341,14 @@ const SettingsPage = () => {
     waybillPrint.colorMode,
     invoiceEnabled,
     waybillEnabled,
+    footerText,
+    waybillFooterText,
   ]);
 
   // Update business settings
   const updateBusinessMutation = useMutation(api.settings.updateBusiness, {
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      if (variables?.phones) profileDirty.current = false;
       toast.success("Business settings updated successfully");
       refetchSettings();
     },
@@ -330,10 +446,7 @@ const SettingsPage = () => {
     };
 
     if (field === "settings") {
-      updatedSettings.settings = {
-        ...settings.business,
-        ...value,
-      };
+      updatedSettings.settings = value;
     }
 
     updateBusinessMutation.mutate(updatedSettings);
@@ -561,7 +674,12 @@ const SettingsPage = () => {
           {/* Business Settings */}
           {activeTab === "business" && (
             <div className="space-y-6">
-              <div className="card p-6">
+              <div
+                className="card p-6"
+                onChange={() => {
+                  profileDirty.current = true;
+                }}
+              >
                 <div className="flex items-center justify-between mb-4 gap-3">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -582,12 +700,79 @@ const SettingsPage = () => {
                         toast.error("Business name is required");
                         return;
                       }
-                      updateBusinessMutation.mutate(profileDraft);
+                      const phones = (profileDraft.phones || [])
+                        .flatMap((phone) => String(phone || "").split(/[\n,;/|]+/))
+                        .map((phone) => phone.trim())
+                        .filter((phone, index, all) => phone && all.indexOf(phone) === index);
+                      const website = String(profileDraft.website || "").trim();
+                      const payload = {
+                        ...profileDraft,
+                        phones,
+                        phone: phones[0] || "",
+                        address: String(profileDraft.address || "").trim(),
+                        city: String(profileDraft.city || "").trim(),
+                        state: String(profileDraft.state || "").trim(),
+                        website:
+                          !website || /^https?:\/?\/?$/i.test(website) ? "" : website,
+                      };
+                      if (!payload.logo && !logoRemoved) delete payload.logo;
+                      updateBusinessMutation.mutate(payload);
                     }}
                   >
                     <Save className="w-4 h-4 mr-2" />
                     Save profile
                   </button>
+                </div>
+                <div className="flex items-center gap-4 mb-5">
+                  <div className="w-24 h-24 rounded-xl border border-gray-200 dark:border-gray-700 bg-white overflow-hidden flex items-center justify-center shrink-0">
+                    {profileDraft?.logo ? (
+                      <img
+                        src={profileDraft.logo}
+                        alt=""
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <Building2 className="w-7 h-7 text-gray-400" />
+                    )}
+                  </div>
+                  <div>
+                    <input
+                      ref={logoInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        readLogoFile(e.target.files?.[0]);
+                        e.target.value = "";
+                      }}
+                    />
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => logoInputRef.current?.click()}
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        {profileDraft?.logo ? "Change logo" : "Add logo"}
+                      </button>
+                      {profileDraft?.logo ? (
+                        <button
+                          type="button"
+                          className="text-sm text-gray-500 hover:text-red-600"
+                          onClick={() => {
+                            profileDirty.current = true;
+                            setLogoRemoved(true);
+                            setProfileDraft((prev) => ({ ...prev, logo: "" }));
+                          }}
+                        >
+                          Remove
+                        </button>
+                      ) : null}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      PNG or JPG. Shown in the app, on receipts, and on your shop.
+                    </p>
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
@@ -634,20 +819,78 @@ const SettingsPage = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Phone
+                      Business number
                     </label>
                     <input
-                      type="tel"
+                      type="text"
                       className="form-input"
-                      value={profileDraft?.phone || ""}
+                      value={profileDraft?.registrationNumber || ""}
                       onChange={(e) =>
                         setProfileDraft((prev) => ({
                           ...prev,
-                          phone: e.target.value,
+                          registrationNumber: e.target.value,
                         }))
                       }
-                      placeholder="Business phone"
+                      placeholder="RC, BN, or registration number"
                     />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Phone numbers
+                    </label>
+                    <div className="space-y-2">
+                      {(profileDraft?.phones || [""]).map((phone, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <input
+                            type="tel"
+                            className="form-input"
+                            value={phone}
+                            onChange={(e) =>
+                              setProfileDraft((prev) => {
+                                const phones = [...(prev.phones || [""])];
+                                phones[index] = e.target.value;
+                                return { ...prev, phones };
+                              })
+                            }
+                            placeholder={
+                              index === 0 ? "Main phone" : "Another phone"
+                            }
+                          />
+                          {(profileDraft?.phones || []).length > 1 ? (
+                            <button
+                              type="button"
+                              className="p-2 text-gray-400 hover:text-red-600"
+                              aria-label="Remove phone"
+                              onClick={() => {
+                                profileDirty.current = true;
+                                setProfileDraft((prev) => ({
+                                  ...prev,
+                                  phones: (prev.phones || []).filter(
+                                    (_, i) => i !== index
+                                  ),
+                                }));
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          ) : null}
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        className="inline-flex items-center text-sm font-medium text-primary-600 hover:text-primary-700"
+                        onClick={() => {
+                          profileDirty.current = true;
+                          setProfileDraft((prev) => ({
+                            ...prev,
+                            phones: [...(prev.phones || [""]), ""],
+                          }));
+                        }}
+                      >
+                        <Plus className="w-4 h-4 mr-1" />
+                        Add phone number
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -734,11 +977,11 @@ const SettingsPage = () => {
                   </div>
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Short description
+                      Business description
                     </label>
                     <textarea
                       className="form-input"
-                      rows={2}
+                      rows={4}
                       value={profileDraft?.description || ""}
                       onChange={(e) =>
                         setProfileDraft((prev) => ({
@@ -746,7 +989,8 @@ const SettingsPage = () => {
                           description: e.target.value,
                         }))
                       }
-                      placeholder="What you sell or do"
+                      maxLength={1000}
+                      placeholder="What your business does, what you sell, and who you serve"
                     />
                   </div>
                 </div>
@@ -984,8 +1228,7 @@ const SettingsPage = () => {
                       </label>
                     </div>
                     <p className="text-xs text-gray-500 ml-7 mt-1">
-                      When enabled, Sales can print a waybill / goods issue note.
-                      Thermal uses the AA ERP Goods Issue Note layout (qty only).
+                      When enabled, Sales can print a waybill in the same layout as the invoice, without prices.
                     </p>
                   </div>
 
@@ -1078,6 +1321,33 @@ const SettingsPage = () => {
                         Thermal invoice is always portrait and black &amp; white.
                       </p>
                     )}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Footer Text
+                      </label>
+                      <textarea
+                        className="form-input"
+                        rows="3"
+                        value={footerText}
+                        onChange={(e) => setFooterDraft(e.target.value)}
+                        onBlur={() => {
+                          if (footerDraft === null || footerDraft === savedFooter) {
+                            setFooterDraft(null);
+                            return;
+                          }
+                          handleBusinessSettingChange("settings", {
+                            receiptSettings: {
+                              ...settings.business?.receiptSettings,
+                              footerText: footerDraft,
+                            },
+                          });
+                        }}
+                        placeholder="Thank you for your business!"
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        Printed at the bottom of the invoice.
+                      </p>
+                    </div>
                     <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                       <p className="text-sm font-medium text-gray-700 mb-2">
                         Invoice preview — {formatPreviewLabel(invoicePrint)}
@@ -1100,7 +1370,13 @@ const SettingsPage = () => {
                           const { printSalesInvoice } = await import(
                             "../../utils/salesDocuments"
                           );
-                          const business = settings.business || {};
+                          const business = {
+                            ...(settings.business || {}),
+                            receiptSettings: {
+                              ...(settings.business?.receiptSettings || {}),
+                              footerText,
+                            },
+                          };
                           printSalesInvoice({
                             business,
                             format: invoicePrint.paperFormat,
@@ -1121,7 +1397,7 @@ const SettingsPage = () => {
                   {waybillEnabled && (
                     <div className="rounded-xl border border-gray-200 p-4 space-y-3">
                       <h4 className="text-sm font-semibold text-gray-900">
-                        Waybill / Goods Issue Note
+                        Waybill
                       </h4>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1203,17 +1479,42 @@ const SettingsPage = () => {
                         </>
                       ) : (
                         <p className="text-xs text-gray-500">
-                          Thermal waybill prints as a Goods Issue Note (portrait,
-                          black &amp; white, qty only).
+                          Thermal waybill uses the same layout as the thermal invoice, without prices.
                         </p>
                       )}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Footer Text
+                        </label>
+                        <textarea
+                          className="form-input"
+                          rows="3"
+                          value={waybillFooterText}
+                          onChange={(e) => setWaybillFooterDraft(e.target.value)}
+                          onBlur={() => {
+                            if (
+                              waybillFooterDraft === null ||
+                              waybillFooterDraft === savedWaybillFooter
+                            ) {
+                              setWaybillFooterDraft(null);
+                              return;
+                            }
+                            handleBusinessSettingChange("settings", {
+                              receiptSettings: {
+                                ...settings.business?.receiptSettings,
+                                waybillFooterText: waybillFooterDraft,
+                              },
+                            });
+                          }}
+                          placeholder="Thank you for your business!"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">
+                          Printed at the bottom of the waybill.
+                        </p>
+                      </div>
                       <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                         <p className="text-sm font-medium text-gray-700 mb-2">
-                          {waybillPrint.paperFormat === "thermal"
-                            ? "Goods Issue Note preview — Thermal"
-                            : `Waybill preview — ${formatPreviewLabel(
-                                waybillPrint
-                              )}`}
+                          {`Waybill preview — ${formatPreviewLabel(waybillPrint)}`}
                         </p>
                         {waybillPreviewUrl ? (
                           <iframe
@@ -1233,7 +1534,13 @@ const SettingsPage = () => {
                             const { printSalesWaybill } = await import(
                               "../../utils/salesDocuments"
                             );
-                            const business = settings.business || {};
+                            const business = {
+                              ...(settings.business || {}),
+                              receiptSettings: {
+                                ...(settings.business?.receiptSettings || {}),
+                                waybillFooterText,
+                              },
+                            };
                             printSalesWaybill({
                               business,
                               format: waybillPrint.paperFormat,
@@ -1244,36 +1551,12 @@ const SettingsPage = () => {
                           }}
                         >
                           <FileText className="w-4 h-4 mr-2" />
-                          Print sample{" "}
-                          {waybillPrint.paperFormat === "thermal"
-                            ? "goods issue note"
-                            : "waybill"}
+                          Print sample waybill
                         </button>
                       </div>
                     </div>
                   )}
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Footer Text
-                    </label>
-                    <textarea
-                      className="form-input"
-                      rows="3"
-                      value={
-                        settings.business?.receiptSettings?.footerText || ""
-                      }
-                      onChange={(e) =>
-                        handleBusinessSettingChange("settings", {
-                          receiptSettings: {
-                            ...settings.business?.receiptSettings,
-                            footerText: e.target.value,
-                          },
-                        })
-                      }
-                      placeholder="Thank you for your business!"
-                    />
-                  </div>
                 </div>
               </div>
 

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useQuery } from "react-query";
 import { useSelector, useDispatch } from "react-redux";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -9,7 +10,6 @@ import {
   Receipt,
   Users,
   Truck,
-  Wallet,
   BarChart3,
   Settings,
   Bell,
@@ -28,11 +28,13 @@ import {
   Percent,
   LifeBuoy,
   Gift,
+  FileText,
 } from "lucide-react";
 
 import { selectUser, logoutUser } from "../../store/slices/authSlice";
 import api from "../../services/api";
 import { applyBrandColors } from "../../utils/brandImage";
+import BusinessDetailsPrompt from "../business/BusinessDetailsPrompt";
 
 const DashboardLayout = ({ children }) => {
   const dispatch = useDispatch();
@@ -49,8 +51,19 @@ const DashboardLayout = ({ children }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [remoteNotes, setRemoteNotes] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [brandLogo, setBrandLogo] = useState(null);
-  const [businessName, setBusinessName] = useState("");
+  const [hideProfilePrompt, setHideProfilePrompt] = useState(false);
+  const { data: settingsData } = useQuery("settings", api.settings.get, {
+    refetchOnWindowFocus: false,
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+  const businessProfile = settingsData?.data?.business;
+  const brandLogo = businessProfile?.logo || null;
+  const businessName = businessProfile?.name || "";
+  const showProfilePrompt =
+    !hideProfilePrompt &&
+    businessProfile?.needsProfileDetails === true &&
+    can("settings.manage");
 
   const loadNotifications = async () => {
     try {
@@ -69,26 +82,13 @@ const DashboardLayout = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const response = await api.settings.get();
-        const business = response?.data?.business || {};
-        if (cancelled) return;
-        applyBrandColors({
-          primaryColor: business.primaryColor,
-          secondaryColor: business.secondaryColor,
-        });
-        setBrandLogo(business.logo || null);
-        setBusinessName(business.name || "");
-      } catch (error) {
-        // keep default Sakora theme
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    const business = settingsData?.data?.business;
+    if (!business) return;
+    applyBrandColors({
+      primaryColor: business.primaryColor,
+      secondaryColor: business.secondaryColor,
+    });
+  }, [settingsData]);
 
   const allNavItems = [
     { name: "Home", href: "/dashboard", icon: Home, color: "#007AFF", permission: "dashboard.view" },
@@ -97,7 +97,7 @@ const DashboardLayout = ({ children }) => {
     { name: "Orders", href: "/orders", icon: ClipboardList, color: "#FF9500", permission: "orders.view" },
     { name: "Storefront", href: "/storefront", icon: Store, color: "#5AC8FA", permission: "storefront.manage" },
     { name: "Invoices", href: "/invoices", icon: Receipt, color: "#FF9500", permission: "orders.manage" },
-    { name: "Cash", href: "/cash", icon: Wallet, color: "#007AFF", permission: "cash.view" },
+    { name: "Quotations", href: "/quotations", icon: FileText, color: "#0D9488", permission: "sales.view" },
     { name: "Purchases", href: "/purchases", icon: TrendingUp, color: "#AF52DE", permission: "purchases.view" },
     { name: "Expenses", href: "/expenses", icon: Receipt, color: "#FF9500", permission: "expenses.view" },
     { name: "Customers", href: "/customers", icon: Users, color: "#5AC8FA", permission: "customers.view" },
@@ -633,6 +633,13 @@ const DashboardLayout = ({ children }) => {
           <Plus className="w-6 h-6 text-white" />
         </button>
       )}
+
+      {showProfilePrompt ? (
+        <BusinessDetailsPrompt
+          business={businessProfile}
+          onLater={() => setHideProfilePrompt(true)}
+        />
+      ) : null}
     </div>
   );
 };

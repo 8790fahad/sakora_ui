@@ -1,5 +1,5 @@
 import { configureStore } from '@reduxjs/toolkit'
-import { persistStore, persistReducer } from 'redux-persist'
+import { persistStore, persistReducer, createTransform } from 'redux-persist'
 import storage from 'redux-persist/lib/storage'
 import { combineReducers } from '@reduxjs/toolkit'
 
@@ -7,11 +7,18 @@ import authSlice from './slices/authSlice'
 import businessSlice from './slices/businessSlice'
 import uiSlice from './slices/uiSlice'
 
+const clearAuthLoading = createTransform(
+  (inbound) => ({ ...inbound, isLoading: false }),
+  (outbound) => ({ ...outbound, isLoading: false }),
+  { whitelist: ['auth'] }
+)
+
 // Persist config
 const persistConfig = {
   key: 'sakora-mobile',
   storage,
   whitelist: ['auth', 'business'],
+  transforms: [clearAuthLoading],
   version: 1,
 }
 

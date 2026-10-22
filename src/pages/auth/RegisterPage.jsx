@@ -44,8 +44,8 @@ const registerSchema = yup.object().shape({
     .required("Email is required"),
   phone: yup
     .string()
-    .matches(/^[0-9+\-\s()]*$/, "Please enter a valid phone number")
-    .min(10, "Phone number must be at least 10 digits")
+    .transform((value) => String(value || "").replace(/[\s()-]/g, ""))
+    .matches(/^\+?[0-9]{10,15}$/, "Please enter a valid phone number")
     .required("Phone number is required"),
   businessName: yup
     .string()
@@ -482,7 +482,7 @@ const RegisterPage = () => {
 
           <div>
             <label htmlFor="phone" className="form-label">
-              Phone Number
+              Phone number
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">

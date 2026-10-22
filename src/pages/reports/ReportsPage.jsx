@@ -17,6 +17,8 @@ import {
   Percent,
   Users,
   Tag,
+  Banknote,
+  Landmark,
 } from "lucide-react";
 import { useQuery } from "react-query";
 import { Link } from "react-router-dom";
@@ -44,6 +46,8 @@ const ReportsPage = () => {
   const [period, setPeriod] = useState("day");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [selectedStockId, setSelectedStockId] = useState(null);
+  const [paymentFilter, setPaymentFilter] = useState("all");
 
   // Common query parameters
   const getQueryParams = () => ({
@@ -94,13 +98,21 @@ const ReportsPage = () => {
 
   // Inventory Report
   const { data: inventoryReportData, isLoading: inventoryLoading } = useQuery(
-    "inventory-report",
-    () => api.reports.inventory(),
+    ["inventory-report", getQueryParams()],
+    () => api.reports.inventory(getQueryParams()),
     {
       enabled: activeReport === "inventory",
       refetchOnWindowFocus: false,
     }
   );
+
+  const { data: settingsData } = useQuery("settings", api.settings.get, {
+    staleTime: 60 * 1000,
+  });
+  const bankAccounts =
+    settingsData?.data?.bankAccounts ||
+    settingsData?.data?.business?.bankAccounts ||
+    [];
 
   const vatParams = vatRangeForPeriod(period, dateFrom, dateTo);
   const { data: vatReportData, isLoading: vatLoading } = useQuery(
@@ -185,9 +197,99 @@ const ReportsPage = () => {
   ];
 
   // Render Sales Report
+  const paymentBuckets = (rows = {}) => {
+    const take = (keys) =>
+      keys.reduce(
+        (sum, key) => {
+          const row = rows[key];
+          if (!row) return sum;
+          return {
+            count: sum.count + (Number(row.count) || 0),
+            amount: sum.amount + (Number(row.amount) || 0),
+          };
+        },
+        { count: 0, amount: 0 }
+      );
+    const cash = take(["cash"]);
+    const bank = take(["bank", "bank_transfer"]);
+    const listed = [
+      { key: "cash", label: "Cash", icon: Banknote, ...cash },
+      { key: "bank", label: "Bank", icon: Landmark, ...bank },
+    ];
+    const used = new Set(["cash", "bank", "bank_transfer"]);
+    Object.entries(rows).forEach(([method, data]) => {
+      if (used.has(method)) return;
+      listed.push({
+        key: method,
+        label: String(method).replace(/_/g, " "),
+        icon: DollarSign,
+        count: Number(data.count) || 0,
+        amount: Number(data.amount) || 0,
+      });
+    });
+    return listed;
+  };
+
   const renderSalesReport = () => {
     const report = salesReportData?.data?.report;
     if (!report) return null;
+    const payments = paymentBuckets(report.salesByPaymentMethod);
+    const paymentSales = report.payments || [];
+    const saleIsBank = (sale) =>
+      sale.paymentMethod === "bank" || sale.paymentMethod === "bank_transfer";
+    const saleMatchesBank = (sale, bank) => {
+      if (!saleIsBank(sale) || !bank) return false;
+      if (sale.bankAccountId && sale.bankAccountId === bank.id) return true;
+      const notes = String(sale.notes || "");
+      return Boolean(bank.accountNumber) && notes.includes(bank.accountNumber);
+    };
+    const moneyOf = (sale) => Number(sale.paidAmount) || Number(sale.total) || 0;
+    const bankNameOf = (sale) => {
+      const saved = bankAccounts.find((bank) => bank.id === sale.bankAccountId);
+      if (saved?.bankName) return saved.bankName;
+      const line = String(sale.notes || "")
+        .split("\n")
+        .find((part) => part.trim().toLowerCase().startsWith("bank:"));
+      if (!line) return "Bank";
+      const named = line.replace(/^bank:\s*/i, "").split("·")[0].trim();
+      return named || "Bank";
+    };
+    const cashPayment = payments.find((row) => row.key === "cash") || {
+      count: 0,
+      amount: 0,
+    };
+    const accountRows = bankAccounts.map((bank) => {
+      const matched = paymentSales.filter((sale) => saleMatchesBank(sale, bank));
+      return {
+        key: bank.id,
+        label: bank.bankName,
+        detail: `${bank.accountNumber} · ${matched.length} transaction${
+          matched.length === 1 ? "" : "s"
+        }`,
+        amount: matched.reduce((sum, sale) => sum + moneyOf(sale), 0),
+        icon: Landmark,
+      };
+    });
+    const paymentRows = [
+      {
+        key: "cash",
+        label: "Cash",
+        detail: `${cashPayment.count} transaction${cashPayment.count === 1 ? "" : "s"}`,
+        amount: cashPayment.amount,
+        icon: Banknote,
+      },
+      ...(accountRows.length
+        ? accountRows
+        : [
+            {
+              key: "bank",
+              label: "Bank",
+              detail: `${payments[1]?.count || 0} transactions`,
+              amount: payments[1]?.amount || 0,
+              icon: Landmark,
+            },
+          ]),
+    ];
 
     return (
       <div className="space-y-6">
@@ -242,11 +344,18 @@ const ReportsPage = () => {
               </div>
             </div>
             <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400">
-              Payment Methods
+              Cash & Bank
             </h4>
-            <p className="text-lg font-bold text-orange-600">
-              {Object.keys(report.salesByPaymentMethod || {}).length} Types
+            <p className="text-lg font-bold text-green-600">
+              Cash {formatCurrency(cashPayment.amount)}
             </p>
+            {(accountRows.length ? accountRows : [{ key: "bank", label: "Bank", amount: payments[1]?.amount || 0 }]).map(
+              (row) => (
+                <p key={row.key} className="text-lg font-bold text-blue-600">
+                  {row.label} {formatCurrency(row.amount)}
+                </p>
+              )
+            )}
           </div>
         </div>
 
@@ -297,31 +406,125 @@ const ReportsPage = () => {
 
         {/* Payment Methods */}
         <div className="card p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Sales by Payment Method
-          </h3>
-          <div className="space-y-3">
-            {Object.entries(report.salesByPaymentMethod || {}).map(
-              ([method, data]) => (
-                <div
-                  key={method}
-                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Cash and Bank
+            </h3>
+            <select
+              className="form-select sm:w-72"
+              value={paymentFilter}
+              onChange={(e) => setPaymentFilter(e.target.value)}
+            >
+              <option value="all">All cash and bank</option>
+              <option value="cash">Cash</option>
+              <option value="bank">All banks</option>
+              {bankAccounts.map((bank) => (
+                <option key={bank.id} value={bank.id}>
+                  {bank.bankName} · {bank.accountNumber}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-3 mb-6">
+            {paymentRows.map((row) => {
+              const Icon = row.icon;
+              const active = paymentFilter === row.key;
+              return (
+                <button
+                  key={row.key}
+                  type="button"
+                  onClick={() => setPaymentFilter(row.key)}
+                  className={`w-full flex items-center justify-between p-3 rounded-lg text-left ${
+                    active
+                      ? "bg-primary-50 ring-1 ring-primary-200"
+                      : "bg-gray-50 dark:bg-gray-700"
+                  }`}
                 >
-                  <div>
-                    <p className="font-medium text-gray-900 dark:text-white capitalize">
-                      {method.replace("_", " ")}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {data.count} transactions
-                    </p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-white dark:bg-gray-600 flex items-center justify-center text-gray-600 dark:text-gray-200">
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-white">
+                        {row.label}
+                      </p>
+                      <p className="text-sm text-gray-500">{row.detail}</p>
+                    </div>
                   </div>
                   <p className="font-bold text-green-600">
-                    {formatCurrency(data.amount)}
+                    {formatCurrency(row.amount)}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+
+          {(() => {
+            const rows = (report.payments || []).filter((sale) => {
+              const method = sale.paymentMethod;
+              const isCash = method === "cash";
+              const isBank = method === "bank" || method === "bank_transfer";
+              if (paymentFilter === "cash") return isCash;
+              if (paymentFilter === "bank") return isBank;
+              if (paymentFilter === "all") return isCash || isBank;
+              const bank = bankAccounts.find((item) => item.id === paymentFilter);
+              if (!bank || !isBank) return false;
+              if (sale.bankAccountId === bank.id) return true;
+              const notes = String(sale.notes || "");
+              return (
+                notes.includes(bank.accountNumber) ||
+                notes.includes(bank.bankName)
+              );
+            });
+            const filteredTotal = rows.reduce(
+              (sum, sale) => sum + (Number(sale.paidAmount) || Number(sale.total) || 0),
+              0
+            );
+            const bankName = bankNameOf;
+            return (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm text-gray-500">
+                    {rows.length} sale{rows.length === 1 ? "" : "s"}
+                  </p>
+                  <p className="font-semibold text-gray-900 dark:text-white">
+                    {formatCurrency(filteredTotal)}
                   </p>
                 </div>
-              )
-            )}
-          </div>
+                {rows.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">
+                    No sales for this filter in the selected period
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {rows.map((sale) => (
+                      <div
+                        key={sale.id}
+                        className="flex items-center justify-between gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-medium text-gray-900 dark:text-white truncate">
+                            {sale.saleNumber}
+                            <span className="text-gray-500 font-normal">
+                              {" "}
+                              · {sale.customerName}
+                            </span>
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            {formatDate(sale.date)} ·{" "}
+                            {sale.paymentMethod === "cash" ? "Cash" : bankName(sale)}
+                          </p>
+                        </div>
+                        <p className="font-bold text-green-600 shrink-0">
+                          {formatCurrency(sale.paidAmount || sale.total)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
     );
@@ -765,12 +968,146 @@ const ReportsPage = () => {
   };
 
   // Render Inventory Report
+  const formatQty = (amount) =>
+    Number(amount || 0).toLocaleString("en-NG", { maximumFractionDigits: 3 });
+
   const renderInventoryReport = () => {
     const report = inventoryReportData?.data?.report;
     if (!report) return null;
+    const selectedProduct = (report.movementProducts || []).find(
+      (row) => (row.productId || row.name) === selectedStockId
+    );
 
     return (
       <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="card p-6">
+            <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400">Stock in</h4>
+            <p className="text-2xl font-bold text-green-600">{formatQty(report.stockIn)}</p>
+            <p className="mt-1 text-xs text-gray-500">Purchases in {getPeriodLabel().toLowerCase()}</p>
+          </div>
+          <div className="card p-6">
+            <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400">Stock out</h4>
+            <p className="text-2xl font-bold text-red-600">{formatQty(report.stockOut)}</p>
+            <p className="mt-1 text-xs text-gray-500">Sales and quotations in {getPeriodLabel().toLowerCase()}</p>
+          </div>
+          <div className="card p-6">
+            <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400">On hand</h4>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatQty(report.onHand)}</p>
+            <p className="mt-1 text-xs text-gray-500">Current stock</p>
+          </div>
+        </div>
+
+        <div className="card p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+            Summary
+          </h3>
+          <p className="text-sm text-gray-500 mb-4">
+            Click a product to see stock in, stock out, and the running balance.
+          </p>
+          {(report.movementProducts || []).length === 0 ? (
+            <p className="text-sm text-gray-500">No stock on hand yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="text-left text-gray-500 border-b">
+                    <th className="py-2 pr-4 font-medium">Product</th>
+                    <th className="py-2 pr-4 font-medium">In</th>
+                    <th className="py-2 pr-4 font-medium">Out</th>
+                    <th className="py-2 font-medium">Balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.movementProducts.map((row) => {
+                    const selected = selectedStockId === (row.productId || row.name);
+                    return (
+                      <tr
+                        key={row.productId || row.name}
+                        className={`border-b border-gray-100 cursor-pointer ${
+                          selected ? "bg-teal-50" : "hover:bg-gray-50"
+                        }`}
+                        onClick={() =>
+                          setSelectedStockId(selected ? null : row.productId || row.name)
+                        }
+                      >
+                        <td className="py-2 pr-4 font-medium text-gray-900 dark:text-white">{row.name}</td>
+                        <td className="py-2 pr-4 text-green-700">{formatQty(row.stockIn)}</td>
+                        <td className="py-2 pr-4 text-red-700">{formatQty(row.stockOut)}</td>
+                        <td className="py-2 font-semibold">
+                          {formatQty(row.balance ?? row.onHand)} {row.unit}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {selectedProduct && (
+            <div className="mt-6">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <h4 className="font-semibold text-gray-900 dark:text-white">
+                  {selectedProduct.name} history
+                </h4>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                  Current balance {formatQty(selectedProduct.balance ?? selectedProduct.onHand)}{" "}
+                  {selectedProduct.unit}
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-gray-500 border-b">
+                      <th className="py-2 pr-4 font-medium">Date</th>
+                      <th className="py-2 pr-4 font-medium">Details</th>
+                      <th className="py-2 pr-4 font-medium">In</th>
+                      <th className="py-2 pr-4 font-medium">Out</th>
+                      <th className="py-2 font-medium">Balance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-b border-gray-100">
+                      <td className="py-2 pr-4 text-gray-500">Opening</td>
+                      <td className="py-2 pr-4">Balance before these movements</td>
+                      <td className="py-2 pr-4"></td>
+                      <td className="py-2 pr-4"></td>
+                      <td className="py-2 font-semibold">
+                        {formatQty(selectedProduct.opening ?? 0)} {selectedProduct.unit}
+                      </td>
+                    </tr>
+                    {(selectedProduct.history || []).length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-3 text-gray-500">
+                          No stock in or out in this period.
+                        </td>
+                      </tr>
+                    ) : (
+                      selectedProduct.history.map((row) => (
+                        <tr key={`${row.kind}-${row.id}`} className="border-b border-gray-100">
+                          <td className="py-2 pr-4">{formatDate(row.date || row.at)}</td>
+                          <td className="py-2 pr-4">
+                            {row.kind} {row.reference}
+                          </td>
+                          <td className="py-2 pr-4 text-green-700">
+                            {row.direction === "in" ? formatQty(row.quantity) : ""}
+                          </td>
+                          <td className="py-2 pr-4 text-red-700">
+                            {row.direction === "out" ? formatQty(row.quantity) : ""}
+                          </td>
+                          <td className="py-2 font-semibold">
+                            {formatQty(row.balance)} {row.unit}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div className="card p-6">

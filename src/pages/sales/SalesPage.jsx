@@ -22,6 +22,7 @@ import { useQuery, useMutation, useQueryClient } from "react-query";
 import toast from "react-hot-toast";
 import api from "../../services/api";
 import { getDocPrintSettings } from "../../utils/salesDocuments";
+import { productImageSrc } from "../../utils/productImage";
 
 const parseScanInput = (raw) => {
   const value = String(raw || "").trim();
@@ -115,6 +116,7 @@ const SalesPage = () => {
       }),
     {
       enabled: view === "pos",
+      staleTime: 0,
     }
   );
 
@@ -198,6 +200,7 @@ const SalesPage = () => {
           notes: "",
         });
         setShowPaymentModal(false);
+        queryClient.invalidateQueries(["products"]);
         queryClient.invalidateQueries("sales-history");
       },
       onError: (error) => {
@@ -219,7 +222,11 @@ const SalesPage = () => {
     (sum, item) => sum + (parseFloat(item.quantity) || 0),
     0
   );
-  const taxAmount = vatEnabled ? (cartTotal * vatRate) / 100 : 0;
+  const taxableTotal = cart.reduce((sum, item) => {
+    if (item.vatStatus !== "Vatable") return sum;
+    return sum + item.quantity * item.price;
+  }, 0);
+  const taxAmount = vatEnabled ? (taxableTotal * vatRate) / 100 : 0;
   const finalTotal = cartTotal + taxAmount - (paymentData.discount || 0);
   const change = parseFloat(paymentData.amountPaid || 0) - finalTotal;
 
@@ -286,6 +293,7 @@ const SalesPage = () => {
               barcode: product.barcode,
               unit: product.unit,
               price: parseFloat(product.sellingPrice),
+              vatStatus: product.vatStatus || "Non-Vatable",
               quantity: available,
               maxQuantity: available,
               image: product.image,
@@ -302,6 +310,7 @@ const SalesPage = () => {
             barcode: product.barcode,
             unit: product.unit,
             price: parseFloat(product.sellingPrice),
+            vatStatus: product.vatStatus || "Non-Vatable",
             quantity: addQty,
             maxQuantity: product.trackInventory ? available : 999999,
             image: product.image,
@@ -447,6 +456,8 @@ const SalesPage = () => {
         unitPrice: item.price,
       })),
       paymentMethod: paymentData.method,
+      bankAccountId:
+        paymentData.method === "bank" ? paymentData.bankAccountId : null,
       paidAmount: parseFloat(paymentData.amountPaid),
       discountAmount: parseFloat(paymentData.discount || 0),
       taxRate: vatEnabled ? vatRate : 0,
@@ -474,15 +485,12 @@ const SalesPage = () => {
       a4: "A4 Standard",
       a5: "A5",
       a6: "A6",
-      thermal: "Thermal GIN",
+      thermal: "Thermal",
     }[waybillPrint.paperFormat] || "Waybill";
   const invoiceEnabled = receiptSettings.includeInvoice !== false;
   const waybillEnabled = receiptSettings.includeWaybill !== false;
   const printDocsEnabled = invoiceEnabled || waybillEnabled;
-  const waybillActionLabel =
-    waybillPrint.paperFormat === "thermal"
-      ? "Print goods issue note"
-      : "Print waybill";
+  const waybillActionLabel = "Print waybill";
 
   const printSaleInvoice = async (sale, { openAsPage = false } = {}) => {
     if (!invoiceEnabled) return;
@@ -701,8 +709,11 @@ const SalesPage = () => {
                       <div className="w-full h-16 bg-gray-100 rounded mb-2 flex items-center justify-center">
                         {product.image ? (
                           <img
-                            src={product.image}
+                            src={productImageSrc(product.image, "sale")}
                             alt={product.name}
+                            width={320}
+                            height={64}
+                            decoding="async"
                             className="w-full h-full object-cover rounded"
                           />
                         ) : (
@@ -722,7 +733,7 @@ const SalesPage = () => {
                           <p className="font-semibold text-primary-600">
                             {formatCurrency(product.sellingPrice)}
                           </p>
-                          {product.trackInventory && (
+                          {product.trackInventory ? (
                             <span
                               className={`text-xs px-2 py-1 rounded-full ${
                                 available > 10
@@ -733,6 +744,10 @@ const SalesPage = () => {
                               }`}
                             >
                               {available}
+                            </span>
+                          ) : (
+                            <span className="text-xs px-2 py-1 rounded-full bg-teal-100 text-teal-800">
+                              Service
                             </span>
                           )}
                         </div>
@@ -1134,14 +1149,7 @@ const SalesPage = () => {
               <button
                 type="button"
                 className="btn btn-primary w-full mt-3"
-                onClick={async () => {
-                  setShowPrintModal(false);
-                  if (invoiceEnabled) {
-                    await printSaleInvoice(completedSale, { openAsPage: true });
-                  } else if (waybillEnabled) {
-                    await printSaleWaybill(completedSale, { openAsPage: true });
-                  }
-                }}
+                onClick={() => setShowPrintModal(false)}
               >
                 Done
               </button>
