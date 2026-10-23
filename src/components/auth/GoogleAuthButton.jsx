@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 
 const GIS_SRC = "https://accounts.google.com/gsi/client";
-const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+const CLIENT_ID =
+  import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+  "175215736246-v9d560u61pgruhqcmns43lfpoal13e89.apps.googleusercontent.com";
 
 let gisLoadPromise = null;
 
