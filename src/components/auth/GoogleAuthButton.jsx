@@ -38,14 +38,22 @@ const loadGisScript = () => {
   return gisLoadPromise;
 };
 
+const buttonWidth = (node) => {
+  const width = Math.floor(node?.getBoundingClientRect().width || 0);
+  if (width < 200) return 0;
+  return Math.min(400, width);
+};
+
 const GoogleAuthButton = ({
   onCredential,
   text = "continue_with",
   disabled = false,
   label = "Continue with Google",
 }) => {
+  const wrapRef = useRef(null);
   const containerRef = useRef(null);
   const callbackRef = useRef(onCredential);
+  const paintedWidth = useRef(0);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
 
@@ -61,6 +69,38 @@ const GoogleAuthButton = ({
 
     let cancelled = false;
 
+    const paint = () => {
+      const wrap = wrapRef.current;
+      const slot = containerRef.current;
+      if (!wrap || !slot || !window.google?.accounts?.id) return;
+      const width = buttonWidth(wrap);
+      if (!width || width === paintedWidth.current) return;
+      paintedWidth.current = width;
+      slot.innerHTML = "";
+      window.google.accounts.id.renderButton(slot, {
+        type: "standard",
+        theme: "outline",
+        size: "large",
+        text,
+        shape: "rectangular",
+        logo_alignment: "left",
+        width,
+      });
+      const clamp = () => {
+        const frame = slot.querySelector("iframe");
+        const shell = slot.firstElementChild;
+        if (shell) {
+          shell.style.maxWidth = "100%";
+          shell.style.width = "100%";
+        }
+        if (frame) {
+          frame.style.maxWidth = "100%";
+          frame.style.width = "100%";
+        }
+      };
+      requestAnimationFrame(() => requestAnimationFrame(clamp));
+    };
+
     const mount = async () => {
       try {
         await loadGisScript();
@@ -68,7 +108,6 @@ const GoogleAuthButton = ({
           return;
         }
 
-        containerRef.current.innerHTML = "";
         window.google.accounts.id.initialize({
           client_id: CLIENT_ID,
           callback: (response) => {
@@ -78,17 +117,11 @@ const GoogleAuthButton = ({
           },
           auto_select: false,
           cancel_on_tap_outside: true,
+          itp_support: true,
         });
-
-        window.google.accounts.id.renderButton(containerRef.current, {
-          type: "standard",
-          theme: "outline",
-          size: "large",
-          text,
-          shape: "rectangular",
-          logo_alignment: "left",
-          width: containerRef.current.offsetWidth || 360,
-        });
+        window.google.accounts.id.cancel?.();
+        paintedWidth.current = 0;
+        paint();
 
         if (!cancelled) {
           setReady(true);
@@ -103,8 +136,17 @@ const GoogleAuthButton = ({
 
     mount();
 
+    const wrap = wrapRef.current;
+    const observer =
+      wrap && typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => paint())
+        : null;
+    if (wrap && observer) observer.observe(wrap);
+
     return () => {
       cancelled = true;
+      observer?.disconnect();
+      window.google?.accounts?.id?.cancel?.();
     };
   }, [text]);
 
@@ -113,10 +155,10 @@ const GoogleAuthButton = ({
   }
 
   return (
-    <div className="w-full">
+    <div ref={wrapRef} className="w-full max-w-full overflow-hidden">
       <div
         ref={containerRef}
-        className={`w-full flex justify-center min-h-[44px] ${
+        className={`w-full max-w-full min-h-[44px] overflow-hidden ${
           disabled ? "pointer-events-none opacity-60" : ""
         }`}
         aria-label={label}

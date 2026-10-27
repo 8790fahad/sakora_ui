@@ -92,7 +92,7 @@ const AuthLayout = ({ children, wide = false }) => {
           </div>
 
           {/* Auth form content */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-100 dark:border-gray-700">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-100 dark:border-gray-700 overflow-hidden">
             {children}
           </div>
 
