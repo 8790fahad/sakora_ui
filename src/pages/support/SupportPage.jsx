@@ -110,7 +110,7 @@ const SupportPage = () => {
             }}
           >
             <input
-              className="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2"
+              className="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-900 dark:text-white"
               placeholder="Subject"
               value={subject}
               maxLength={160}
@@ -118,7 +118,7 @@ const SupportPage = () => {
               required
             />
             <textarea
-              className="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 min-h-28"
+              className="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 min-h-28 text-gray-900 dark:text-white"
               placeholder="What do you need help with?"
               value={message}
               maxLength={4000}
@@ -203,7 +203,7 @@ const SupportPage = () => {
                     }}
                   >
                     <input
-                      className="flex-1 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2"
+                      className="flex-1 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-900 dark:text-white"
                       placeholder="Add a message"
                       value={reply}
                       onChange={(event) => setReply(event.target.value)}
