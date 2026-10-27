@@ -4,7 +4,9 @@ import {
   Routes,
   Route,
   Navigate,
+  useLocation,
 } from "react-router-dom";
+import { rememberBillingNext, takeBillingNext, safeBillingNext } from "./utils/billingNext";
 import { useDispatch, useSelector } from "react-redux";
 
 // Import components
@@ -114,16 +116,28 @@ function App() {
 
   // Protected route wrapper
   const ProtectedRoute = ({ children }) => {
+    const location = useLocation();
     if (!isAuthenticated) {
-      return <Navigate to="/login" replace />;
+      const next = `${location.pathname}${location.search}`;
+      return (
+        <Navigate
+          to={`/login?next=${encodeURIComponent(next)}`}
+          replace
+        />
+      );
     }
     return children;
   };
 
   // Public route wrapper (redirects to dashboard if authenticated)
   const PublicRoute = ({ children }) => {
+    const location = useLocation();
+    rememberBillingNext(location.search);
     if (isAuthenticated) {
-      return <Navigate to="/dashboard" replace />;
+      const next =
+        safeBillingNext(new URLSearchParams(location.search).get("next")) ||
+        takeBillingNext();
+      return <Navigate to={next || "/dashboard"} replace />;
     }
     return children;
   };

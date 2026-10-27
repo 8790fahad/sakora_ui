@@ -395,8 +395,14 @@ const apiMethods = {
 
   subscriptions: {
     plans: () => api.get("/subscriptions/plans"),
-    checkout: (plan, interval = "month", callbackUrl) =>
-      api.post("/subscriptions/checkout", { plan, interval, callbackUrl }),
+    checkout: (plan, interval = "month", callbackUrl, amount, coupon) =>
+      api.post("/subscriptions/checkout", {
+        plan,
+        interval,
+        callbackUrl,
+        amount,
+        coupon,
+      }),
     verify: (data) => api.post("/subscriptions/verify", data),
     cancel: () => api.post("/subscriptions/cancel"),
   },

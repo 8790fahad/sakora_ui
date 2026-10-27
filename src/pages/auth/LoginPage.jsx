@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -32,6 +32,7 @@ const loginSchema = yup.object().shape({
 const LoginPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const isLoading = useSelector(selectAuthLoading);
   const error = useSelector(selectAuthError);
 
@@ -207,7 +208,7 @@ const LoginPage = () => {
         <p className="text-gray-600 dark:text-gray-400">
           Don't have an account?{" "}
           <Link
-            to="/register"
+            to={`/register${location.search}`}
             className="font-semibold text-primary-600 hover:text-primary-500 dark:text-primary-400"
           >
             Sign up now

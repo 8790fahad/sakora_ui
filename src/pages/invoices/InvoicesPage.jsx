@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "react-query";
 import { MessageCircle, Copy } from "lucide-react";
+import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import api from "../../services/api";
 import { whatsappLink, copyText, orderUrl } from "../../utils/share";
@@ -17,6 +18,8 @@ const InvoicesPage = () => {
   const products = productData?.data?.items || [];
   const invoices = orderData?.data?.items || [];
   const shop = shopData?.data || {};
+  const squadReady = Boolean(shop.squad?.enabled && shop.squad?.hasSecret);
+  const canInvoice = Boolean(shop.enabled && squadReady);
 
   const [form, setForm] = useState({
     customerName: "",
@@ -51,14 +54,25 @@ const InvoicesPage = () => {
       <div>
         <h1 className="text-2xl font-bold">Invoices</h1>
         <p className="text-slate-500">
-          Create a bill, send it on WhatsApp, and collect payment with Squad.
+          Create a bill from your shop and collect it with Squad.
         </p>
       </div>
+      {!canInvoice && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {!shop.enabled
+            ? "Turn on the storefront in Settings. Invoices stay under Storefront after that."
+            : "On the Storefront page, turn on Squad and save your public and secret keys."}{" "}
+          <Link to={shop.enabled ? "/storefront" : "/settings"} className="font-semibold underline">
+            {shop.enabled ? "Open Storefront" : "Open Settings"}
+          </Link>
+        </div>
+      )}
 
       <form
         className="bg-white rounded-2xl border p-5 space-y-3"
         onSubmit={(e) => {
           e.preventDefault();
+          if (!canInvoice) return;
           createInvoice.mutate({
             customerName: form.customerName,
             customerPhone: form.customerPhone,
@@ -109,8 +123,12 @@ const InvoicesPage = () => {
             onChange={(e) => setForm({ ...form, quantity: e.target.value })}
           />
         </div>
-        <button className="w-full py-3 rounded-xl bg-teal-600 text-white font-medium">
-          Create & share invoice
+        <button
+          type="submit"
+          disabled={!canInvoice || createInvoice.isLoading}
+          className="w-full py-3 rounded-xl bg-teal-600 text-white font-medium disabled:opacity-50"
+        >
+          {createInvoice.isLoading ? "Creating..." : "Create & share invoice"}
         </button>
       </form>
 

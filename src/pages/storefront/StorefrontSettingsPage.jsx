@@ -16,6 +16,10 @@ const StorefrontSettingsPage = () => {
     shippingFee: 0,
     whatsapp: "",
     instagram: "",
+    squadEnabled: false,
+    squadPublicKey: "",
+    squadSecretKey: "",
+    squadHasSecret: false,
   });
 
   useEffect(() => {
@@ -28,13 +32,21 @@ const StorefrontSettingsPage = () => {
       shippingFee: shopSettings.shippingFee || 0,
       whatsapp: shopSettings.whatsapp || "",
       instagram: shopSettings.instagram || "",
+      squadEnabled: Boolean(data.data.squad?.enabled),
+      squadPublicKey: data.data.squad?.publicKey || "",
+      squadSecretKey: "",
+      squadHasSecret: Boolean(data.data.squad?.hasSecret),
     });
   }, [data]);
 
   const save = useMutation(api.storefront.updateSettings, {
     onSuccess: () => {
       toast.success("Storefront updated");
+      setForm((prev) => ({ ...prev, squadSecretKey: "" }));
       queryClient.invalidateQueries("storefront-settings");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Could not save the storefront");
     },
   });
 
@@ -43,8 +55,8 @@ const StorefrontSettingsPage = () => {
   return (
     <div className="p-4 md:p-8 max-w-2xl">
       <h1 className="text-2xl font-bold">Your shop</h1>
-      <p className="text-slate-500 mb-6">
-        Share a link, sell on WhatsApp, and collect payment with Squad.
+        <p className="text-slate-500 mb-6">
+        Share a link, sell on WhatsApp, and collect invoice payments with your own Squad account.
       </p>
 
       <div className="bg-white rounded-2xl border p-5 space-y-4">
@@ -106,6 +118,46 @@ const StorefrontSettingsPage = () => {
             }
           />
         </div>
+        <div className="border-t pt-4 space-y-3">
+          <label className="flex items-center justify-between gap-4">
+            <span>
+              <span className="font-medium block">Enable Squad</span>
+              <span className="text-sm text-slate-500">
+                Invoice and shop payments use these keys. The secret is encrypted before it is saved.
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              checked={form.squadEnabled}
+              onChange={(e) => setForm({ ...form, squadEnabled: e.target.checked })}
+            />
+          </label>
+          <div>
+            <label className="text-sm text-slate-500">Squad public key</label>
+            <input
+              className="w-full border rounded-xl px-3 py-2 mt-1"
+              autoComplete="off"
+              placeholder="pk_..."
+              value={form.squadPublicKey}
+              onChange={(e) => setForm({ ...form, squadPublicKey: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="text-sm text-slate-500">Squad secret key</label>
+            <input
+              type="password"
+              className="w-full border rounded-xl px-3 py-2 mt-1"
+              autoComplete="new-password"
+              placeholder={
+                form.squadHasSecret
+                  ? "Saved. Enter a new key only to replace it"
+                  : "sk_..."
+              }
+              value={form.squadSecretKey}
+              onChange={(e) => setForm({ ...form, squadSecretKey: e.target.value })}
+            />
+          </div>
+        </div>
         <div className="flex items-center gap-2 text-sm bg-slate-50 rounded-xl p-3">
           <Store className="w-4 h-4" />
           <span className="truncate flex-1">{url}</span>
@@ -144,6 +196,13 @@ const StorefrontSettingsPage = () => {
                 shippingFee: parseFloat(form.shippingFee) || 0,
                 whatsapp: form.whatsapp,
                 instagram: form.instagram,
+              },
+              squad: {
+                enabled: form.squadEnabled,
+                publicKey: form.squadPublicKey,
+                ...(form.squadSecretKey.trim()
+                  ? { secretKey: form.squadSecretKey.trim() }
+                  : {}),
               },
             })
           }

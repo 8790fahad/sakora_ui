@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useQuery } from "react-query";
 import { useSelector, useDispatch } from "react-redux";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -35,6 +35,13 @@ import { selectUser, logoutUser } from "../../store/slices/authSlice";
 import api from "../../services/api";
 import { applyBrandColors } from "../../utils/brandImage";
 import BusinessDetailsPrompt from "../business/BusinessDetailsPrompt";
+import AppGuide from "../guide/AppGuide";
+import {
+  APP_GUIDE_COPY,
+  isNewAccount,
+  pageGuideKey,
+} from "../guide/appGuideCopy";
+import { hasActivePlan } from "../../utils/planAccess";
 
 const DashboardLayout = ({ children }) => {
   const dispatch = useDispatch();
@@ -52,11 +59,32 @@ const DashboardLayout = ({ children }) => {
   const [remoteNotes, setRemoteNotes] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [hideProfilePrompt, setHideProfilePrompt] = useState(false);
+  const [dismissedGuidePath, setDismissedGuidePath] = useState("");
+  const { data: billingData, isError: planError } = useQuery(
+    "billing-plans",
+    api.subscriptions.plans,
+    { refetchOnWindowFocus: false, staleTime: 0, retry: false }
+  );
+  const currentPlan = billingData?.data?.current;
+  const planActive = hasActivePlan(currentPlan?.plan, currentPlan?.expiry);
+  const onBilling = location.pathname === "/billing";
+  const mustChoosePlan = Boolean(billingData) && !planActive && !planError && !onBilling;
+
+  useEffect(() => {
+    if (mustChoosePlan) navigate("/billing", { replace: true });
+  }, [mustChoosePlan, navigate]);
+
   const { data: settingsData } = useQuery("settings", api.settings.get, {
     refetchOnWindowFocus: false,
     staleTime: 0,
     refetchOnMount: "always",
   });
+  const { data: shopData } = useQuery(
+    "storefront-settings",
+    api.storefront.settings,
+    { refetchOnWindowFocus: false, retry: false }
+  );
+  const storefrontEnabled = Boolean(shopData?.data?.enabled);
   const businessProfile = settingsData?.data?.business;
   const brandLogo = businessProfile?.logo || null;
   const businessName = businessProfile?.name || "";
@@ -96,7 +124,7 @@ const DashboardLayout = ({ children }) => {
     { name: "Sales", href: "/sales", icon: ShoppingCart, color: "#34C759", permission: "sales.view" },
     { name: "Orders", href: "/orders", icon: ClipboardList, color: "#FF9500", permission: "orders.view" },
     { name: "Storefront", href: "/storefront", icon: Store, color: "#5AC8FA", permission: "storefront.manage" },
-    { name: "Invoices", href: "/invoices", icon: Receipt, color: "#FF9500", permission: "orders.manage" },
+    { name: "Invoices", href: "/invoices", icon: Receipt, color: "#FF9500", permission: "orders.manage", nested: true },
     { name: "Quotations", href: "/quotations", icon: FileText, color: "#0D9488", permission: "sales.view" },
     { name: "Purchases", href: "/purchases", icon: TrendingUp, color: "#AF52DE", permission: "purchases.view" },
     { name: "Expenses", href: "/expenses", icon: Receipt, color: "#FF9500", permission: "expenses.view" },
@@ -108,7 +136,54 @@ const DashboardLayout = ({ children }) => {
     { name: "Billing", href: "/billing", icon: CreditCard, color: "#34C759", permission: "billing.manage" },
     { name: "Referrals", href: "/referrals", icon: Gift, color: "#AF52DE", permission: "billing.manage" },
     { name: "Support", href: "/support", icon: LifeBuoy, color: "#0D9488" },
-  ].filter((item) => !item.permission || can(item.permission));
+  ].filter((item) => !item.permission || can(item.permission))
+    .filter((item) => {
+      if (item.href === "/storefront" || item.href === "/invoices") {
+        return storefrontEnabled;
+      }
+      return true;
+    });
+
+  const guidePath =
+    Object.keys(APP_GUIDE_COPY).find((href) =>
+      href === "/dashboard"
+        ? location.pathname === "/dashboard"
+        : location.pathname === href || location.pathname.startsWith(`${href}/`)
+    ) || "";
+  const guideTitle =
+    allNavItems.find((item) => item.href === guidePath)?.name ||
+    (guidePath === "/settings" ? "Settings" : "");
+  const guideStep = guidePath
+    ? {
+        id: guidePath,
+        title: guideTitle,
+        body: APP_GUIDE_COPY[guidePath],
+        mobilePlace: ["/dashboard", "/products", "/orders", "/sales"].includes(guidePath)
+          ? "tab"
+          : "more",
+      }
+    : null;
+  const guideSeen =
+    !user?.id ||
+    dismissedGuidePath === guidePath ||
+    localStorage.getItem(pageGuideKey(user.id, guidePath)) === "1";
+  const showGuide =
+    Boolean(guideStep) &&
+    !guideSeen &&
+    !showProfilePrompt &&
+    isNewAccount(businessProfile);
+  const prepareGuide = useCallback((step) => {
+    setSidebarCollapsed(false);
+    const mobile = window.matchMedia("(max-width: 767px)").matches;
+    setShowMore(mobile && step.mobilePlace === "more");
+  }, []);
+  const finishGuide = () => {
+    if (user?.id && guidePath) {
+      localStorage.setItem(pageGuideKey(user.id, guidePath), "1");
+    }
+    setDismissedGuidePath(guidePath);
+    setShowMore(false);
+  };
 
   const unreadNotifications = unreadCount;
 
@@ -197,8 +272,13 @@ const DashboardLayout = ({ children }) => {
                 <Link
                   key={item.name}
                   to={item.href}
+                  data-guide={item.href}
                   className={`group flex items-center rounded-xl transition-all duration-200 ${
-                    sidebarCollapsed ? "justify-center p-3" : "px-3 py-2.5"
+                    sidebarCollapsed
+                      ? "justify-center p-3"
+                      : item.nested
+                        ? "ml-6 px-3 py-2"
+                        : "px-3 py-2.5"
                   } ${
                     active
                       ? "bg-[var(--ios-blue)] text-white shadow-sm"
@@ -278,6 +358,7 @@ const DashboardLayout = ({ children }) => {
             <div className="space-y-1">
               <Link
                 to="/settings"
+                data-guide="/settings"
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
                   isActive("/settings")
                     ? "bg-[var(--ios-blue)] text-white shadow-sm"
@@ -460,7 +541,15 @@ const DashboardLayout = ({ children }) => {
           className="min-h-[calc(100vh-var(--tab-bar-height)-56px)] md:min-h-[calc(100vh-56px)] pb-[var(--tab-bar-height)] md:pb-6"
           style={{ paddingTop: "0" }}
         >
-          {children}
+          {!billingData && !planError && !onBilling ? (
+            <div className="p-8 text-slate-500">Loading...</div>
+          ) : onBilling || planActive || planError ? (
+            children
+          ) : (
+            <div className="p-8 text-slate-500">
+              A plan is required to use Sakora.
+            </div>
+          )}
         </main>
       </div>
 
@@ -498,6 +587,7 @@ const DashboardLayout = ({ children }) => {
               <Link
                 key={item.name}
                 to={item.href}
+                data-guide={item.href}
                 className={`ios-tab-item ${active ? "active" : ""}`}
               >
                 <Icon className="ios-tab-item-icon" />
@@ -551,6 +641,7 @@ const DashboardLayout = ({ children }) => {
               <div className="ios-list mx-4">
                 <Link
                   to="/settings"
+                  data-guide="/settings"
                   onClick={() => setShowMore(false)}
                   className="ios-list-item"
                 >
@@ -576,8 +667,9 @@ const DashboardLayout = ({ children }) => {
                     <Link
                       key={item.name}
                       to={item.href}
+                      data-guide={item.href}
                       onClick={() => setShowMore(false)}
-                      className="ios-list-item"
+                      className={`ios-list-item ${item.nested ? "pl-8" : ""}`}
                     >
                       <div
                         className="w-8 h-8 rounded-lg flex items-center justify-center mr-3"
@@ -633,6 +725,10 @@ const DashboardLayout = ({ children }) => {
           <Plus className="w-6 h-6 text-white" />
         </button>
       )}
+
+      {showGuide ? (
+        <AppGuide step={guideStep} onDone={finishGuide} onPrepare={prepareGuide} />
+      ) : null}
 
       {showProfilePrompt ? (
         <BusinessDetailsPrompt

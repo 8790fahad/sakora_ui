@@ -76,7 +76,9 @@ const DashboardPage = () => {
   const actions = [
     { name: "Record sale", href: "/sales", icon: ShoppingCart },
     { name: "Add product", href: "/products", icon: Plus },
-    { name: "Invoice", href: "/invoices", icon: Receipt },
+    ...(shop.enabled
+      ? [{ name: "Invoice", href: "/invoices", icon: Receipt }]
+      : []),
     { name: "Orders", href: "/orders", icon: ClipboardList },
   ];
 

@@ -31,6 +31,12 @@ import {
 import GoogleAuthButton from "../../components/auth/GoogleAuthButton";
 import AuthDivider from "../../components/auth/AuthDivider";
 import api from "../../services/api";
+import {
+  SIGNUP_PLANS,
+  planFromSearch,
+  rememberSignupPlan,
+  signupBillingPath,
+} from "../../utils/billingNext";
 
 const registerSchema = yup.object().shape({
   name: yup
@@ -88,7 +94,7 @@ const verifySchema = yup.object().shape({
 const RegisterPage = () => {
   const dispatch = useDispatch();
   const location = useLocation();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isLoading = useSelector(selectAuthLoading);
   const error = useSelector(selectAuthError);
 
@@ -112,10 +118,26 @@ const RegisterPage = () => {
   const [resendCooldown, setResendCooldown] = useState(
     location.state?.verifyEmail ? 30 : 0
   );
+  const [selectedPlan, setSelectedPlan] = useState(
+    () => planFromSearch(location.search) || "growth"
+  );
+
+  const chosenPlan =
+    SIGNUP_PLANS.find((plan) => plan.key === selectedPlan) || SIGNUP_PLANS[1];
+  const money = (amount) => `₦${Number(amount || 0).toLocaleString()}`;
 
   useEffect(() => {
     dispatch(clearError());
   }, [dispatch]);
+
+  useEffect(() => {
+    const path = signupBillingPath(selectedPlan);
+    rememberSignupPlan(selectedPlan);
+    if (searchParams.get("next") === path) return;
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("next", path);
+    setSearchParams(nextParams, { replace: true });
+  }, [selectedPlan, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!initialReferralCode) return undefined;
@@ -181,6 +203,7 @@ const RegisterPage = () => {
   const onGoogleCredential = async (idToken) => {
     try {
       dispatch(clearError());
+      rememberSignupPlan(selectedPlan);
       const result = await dispatch(
         googleAuth({
           idToken,
@@ -223,6 +246,7 @@ const RegisterPage = () => {
   const onSubmit = async (data) => {
     try {
       dispatch(clearError());
+      rememberSignupPlan(selectedPlan);
 
       const nameParts = (data.name || "").trim().split(" ");
       const firstName = nameParts[0] || "";
@@ -292,11 +316,13 @@ const RegisterPage = () => {
           <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
             Verify your email
           </h2>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">
+            <p className="mt-2 text-gray-600 dark:text-gray-400">
             Enter the 6-digit code we sent to{" "}
             <span className="font-medium text-gray-900 dark:text-white">
               {pendingEmail}
             </span>
+            . After that you pay for {chosenPlan.name} (₦
+            {chosenPlan.price.toLocaleString()}/mo).
           </p>
         </div>
 
@@ -349,7 +375,7 @@ const RegisterPage = () => {
                 Verifying...
               </div>
             ) : (
-              "Verify and continue"
+              "Verify and pay"
             )}
           </button>
         </form>
@@ -388,8 +414,30 @@ const RegisterPage = () => {
           Create Account
         </h2>
         <p className="mt-2 text-gray-600 dark:text-gray-400">
-          Start managing your business today
+          Choose a plan, create the shop, then pay with Squad.
         </p>
+      </div>
+
+      <div className="mb-6 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        {SIGNUP_PLANS.map((plan) => (
+          <button
+            key={plan.key}
+            type="button"
+            onClick={() => setSelectedPlan(plan.key)}
+            className={`rounded-xl border px-3 py-3 text-left ${
+              selectedPlan === plan.key
+                ? "border-teal-600 bg-teal-50"
+                : "border-gray-200 bg-white"
+            }`}
+          >
+            <span className="block text-sm font-semibold text-gray-900">
+              {plan.name}
+            </span>
+            <span className="block text-xs text-gray-500">
+              {money(plan.price)}/mo
+            </span>
+          </button>
+        ))}
       </div>
 
       {error && (
@@ -747,7 +795,7 @@ const RegisterPage = () => {
         <p className="text-gray-600 dark:text-gray-400">
           Already have an account?{" "}
           <Link
-            to="/login"
+            to={`/login${location.search}`}
             className="font-semibold text-primary-600 hover:text-primary-500 dark:text-primary-400"
           >
             Sign in

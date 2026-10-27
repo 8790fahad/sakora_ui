@@ -94,7 +94,24 @@ const SettingsPage = () => {
     refetchOnMount: "always",
   });
 
-  // Fetch system info
+  const { data: shopData } = useQuery(
+    "storefront-settings",
+    api.storefront.settings,
+    { refetchOnWindowFocus: false, retry: false }
+  );
+  const shopEnabled = Boolean(shopData?.data?.enabled);
+  const updateStorefront = useMutation(api.storefront.updateSettings, {
+    onSuccess: (_data, variables) => {
+      toast.success(
+        variables?.enabled ? "Storefront turned on" : "Storefront turned off"
+      );
+      queryClient.invalidateQueries("storefront-settings");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Could not update the storefront");
+    },
+  });
+
   const { data: systemData, isLoading: systemLoading } = useQuery(
     "system-info",
     api.settings.systemInfo,
@@ -674,6 +691,32 @@ const SettingsPage = () => {
           {/* Business Settings */}
           {activeTab === "business" && (
             <div className="space-y-6">
+              <div className="card p-6">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Storefront
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      The public shop stays off until you turn it on here.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className={shopEnabled ? "btn btn-secondary" : "btn btn-primary"}
+                    disabled={updateStorefront.isLoading || !shopData?.data}
+                    onClick={() =>
+                      updateStorefront.mutate({ enabled: !shopEnabled })
+                    }
+                  >
+                    {updateStorefront.isLoading
+                      ? "Saving..."
+                      : shopEnabled
+                        ? "Turn off"
+                        : "Enable storefront"}
+                  </button>
+                </div>
+              </div>
               <div
                 className="card p-6"
                 onChange={() => {
