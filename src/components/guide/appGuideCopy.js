@@ -28,7 +28,7 @@ export const APP_GUIDE_COPY = {
   "/team":
     "Team is where you add staff and choose which parts of Sakora each person can open.",
   "/billing":
-    "Billing is your Sakora plan. Starter is ₦4,000 a month, Growth is ₦12,000, and Business is ₦20,000. Pay here with Squad.",
+    "Billing is your Sakora plan. Starter is ₦4,000 a month, Growth is ₦12,000, and Business is ₦20,000. Pay for 1, 12, 24, or 48 months. A longer term costs less each month.",
   "/referrals":
     "Referrals is your invite code. Share it, and you earn a commission when that business subscribes.",
   "/support":

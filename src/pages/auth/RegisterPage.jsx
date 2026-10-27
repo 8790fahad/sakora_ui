@@ -33,6 +33,7 @@ import AuthDivider from "../../components/auth/AuthDivider";
 import api from "../../services/api";
 import {
   SIGNUP_PLANS,
+  monthsFromSearch,
   planFromSearch,
   rememberSignupPlan,
   signupBillingPath,
@@ -131,13 +132,14 @@ const RegisterPage = () => {
   }, [dispatch]);
 
   useEffect(() => {
-    const path = signupBillingPath(selectedPlan);
-    rememberSignupPlan(selectedPlan);
+    const months = monthsFromSearch(location.search);
+    const path = signupBillingPath(selectedPlan, months);
+    rememberSignupPlan(selectedPlan, months);
     if (searchParams.get("next") === path) return;
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set("next", path);
     setSearchParams(nextParams, { replace: true });
-  }, [selectedPlan, searchParams, setSearchParams]);
+  }, [selectedPlan, searchParams, setSearchParams, location.search]);
 
   useEffect(() => {
     if (!initialReferralCode) return undefined;
@@ -321,8 +323,7 @@ const RegisterPage = () => {
             <span className="font-medium text-gray-900 dark:text-white">
               {pendingEmail}
             </span>
-            . After that you pay for {chosenPlan.name} (₦
-            {chosenPlan.price.toLocaleString()}/mo).
+            . After that you choose 1, 12, 24, or 48 months for {chosenPlan.name}.
           </p>
         </div>
 
@@ -414,7 +415,7 @@ const RegisterPage = () => {
           Create Account
         </h2>
         <p className="mt-2 text-gray-600 dark:text-gray-400">
-          Choose a plan, create the shop, then pay with Squad.
+          Choose a plan, create the shop, then pay with Squad. Longer terms cost less per month.
         </p>
       </div>
 

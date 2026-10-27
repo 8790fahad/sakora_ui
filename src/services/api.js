@@ -395,12 +395,12 @@ const apiMethods = {
 
   subscriptions: {
     plans: () => api.get("/subscriptions/plans"),
-    checkout: (plan, interval = "month", callbackUrl, amount, coupon) =>
+    quote: (data) => api.post("/subscriptions/quote", data),
+    checkout: (plan, months, callbackUrl, coupon) =>
       api.post("/subscriptions/checkout", {
         plan,
-        interval,
+        months,
         callbackUrl,
-        amount,
         coupon,
       }),
     verify: (data) => api.post("/subscriptions/verify", data),

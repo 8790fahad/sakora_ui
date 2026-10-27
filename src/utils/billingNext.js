@@ -6,17 +6,28 @@ export const SIGNUP_PLANS = [
   { key: "business", name: "Business", price: 20000 },
 ];
 
+export const BILLING_MONTHS = [1, 12, 24, 48];
+
 export const isSignupPlan = (key) =>
   SIGNUP_PLANS.some((plan) => plan.key === key);
 
-export const signupBillingPath = (plan) => {
-  const params = new URLSearchParams({ plan, signup: "1" });
+export const billingMonths = (value) => {
+  const months = Number(value);
+  return BILLING_MONTHS.includes(months) ? months : 48;
+};
+
+export const signupBillingPath = (plan, months = 48) => {
+  const params = new URLSearchParams({
+    plan,
+    months: String(billingMonths(months)),
+    signup: "1",
+  });
   return `/billing?${params.toString()}`;
 };
 
-export const rememberSignupPlan = (plan) => {
+export const rememberSignupPlan = (plan, months = 48) => {
   if (!isSignupPlan(plan)) return;
-  sessionStorage.setItem(STORAGE_KEY, signupBillingPath(plan));
+  sessionStorage.setItem(STORAGE_KEY, signupBillingPath(plan, months));
 };
 
 export const safeBillingNext = (value) => {
@@ -31,6 +42,17 @@ export const safeBillingNext = (value) => {
     return "";
   }
   return path;
+};
+
+export const monthsFromSearch = (search = "") => {
+  const params = new URLSearchParams(
+    String(search).startsWith("?") ? String(search).slice(1) : String(search)
+  );
+  const direct = Number(params.get("months"));
+  if (BILLING_MONTHS.includes(direct)) return direct;
+  const next = safeBillingNext(params.get("next") || "");
+  const nested = Number(new URLSearchParams(next.split("?")[1] || "").get("months"));
+  return BILLING_MONTHS.includes(nested) ? nested : 48;
 };
 
 export const planFromSearch = (search = "") => {
