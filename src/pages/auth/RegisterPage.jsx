@@ -84,6 +84,29 @@ const registerSchema = yup.object().shape({
     .matches(/^$|^[A-Z0-9]{4,16}$/, "Enter a valid referral code"),
 });
 
+const FORM_STEPS = [
+  {
+    title: "Your details",
+    hint: "Name and email are enough to start.",
+    fields: ["name", "email"],
+  },
+  {
+    title: "Your shop",
+    hint: "Customers will see this shop name.",
+    fields: ["businessName", "phone"],
+  },
+  {
+    title: "Your password",
+    hint: "At least 6 characters, with a letter and a number.",
+    fields: ["password", "confirmPassword"],
+  },
+  {
+    title: "Your plan",
+    hint: "Pick one. You pay after we verify your email.",
+    fields: ["acceptTerms", "referralCode"],
+  },
+];
+
 const verifySchema = yup.object().shape({
   code: yup
     .string()
@@ -122,6 +145,7 @@ const RegisterPage = () => {
   const [selectedPlan, setSelectedPlan] = useState(
     () => planFromSearch(location.search) || "growth"
   );
+  const [formStep, setFormStep] = useState(0);
 
   const chosenPlan =
     SIGNUP_PLANS.find((plan) => plan.key === selectedPlan) || SIGNUP_PLANS[1];
@@ -176,6 +200,7 @@ const RegisterPage = () => {
   const {
     register,
     handleSubmit,
+    trigger,
     formState: { errors, isSubmitting },
     watch,
   } = useForm({
@@ -205,7 +230,7 @@ const RegisterPage = () => {
   const onGoogleCredential = async (idToken) => {
     try {
       dispatch(clearError());
-      rememberSignupPlan(selectedPlan);
+      rememberSignupPlan(selectedPlan, monthsFromSearch(location.search));
       const result = await dispatch(
         googleAuth({
           idToken,
@@ -244,11 +269,26 @@ const RegisterPage = () => {
   };
 
   const passwordStrength = getPasswordStrength(password);
+  const currentStep = FORM_STEPS[formStep];
+
+  const goNext = async () => {
+    const valid = await trigger(currentStep.fields);
+    if (valid) setFormStep((value) => Math.min(value + 1, FORM_STEPS.length - 1));
+  };
+
+  const onFormSubmit = (event) => {
+    if (formStep < FORM_STEPS.length - 1) {
+      event.preventDefault();
+      goNext();
+      return;
+    }
+    handleSubmit(onSubmit)(event);
+  };
 
   const onSubmit = async (data) => {
     try {
       dispatch(clearError());
-      rememberSignupPlan(selectedPlan);
+      rememberSignupPlan(selectedPlan, monthsFromSearch(location.search));
 
       const nameParts = (data.name || "").trim().split(" ");
       const firstName = nameParts[0] || "";
@@ -397,6 +437,7 @@ const RegisterPage = () => {
             type="button"
             onClick={() => {
               setStep("register");
+              setFormStep(0);
               dispatch(clearError());
             }}
             className="font-medium text-gray-500 hover:text-gray-700"
@@ -409,36 +450,25 @@ const RegisterPage = () => {
   }
 
   return (
-    <div className="w-full">
+    <div className="w-full max-w-md mx-auto">
       <div className="mb-6">
-        <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
-          Create Account
-        </h2>
-        <p className="mt-2 text-gray-600 dark:text-gray-400">
-          Choose a plan, create the shop, then pay with Squad. Longer terms cost less per month.
+        <p className="text-sm font-semibold text-teal-700">
+          Step {formStep + 1} of {FORM_STEPS.length}
         </p>
-      </div>
-
-      <div className="mb-6 grid grid-cols-1 gap-2 sm:grid-cols-3">
-        {SIGNUP_PLANS.map((plan) => (
-          <button
-            key={plan.key}
-            type="button"
-            onClick={() => setSelectedPlan(plan.key)}
-            className={`rounded-xl border px-3 py-3 text-left ${
-              selectedPlan === plan.key
-                ? "border-teal-600 bg-teal-50"
-                : "border-gray-200 bg-white"
-            }`}
-          >
-            <span className="block text-sm font-semibold text-gray-900">
-              {plan.name}
-            </span>
-            <span className="block text-xs text-gray-500">
-              {money(plan.price)}/mo
-            </span>
-          </button>
-        ))}
+        <div className="mt-3 flex gap-2" aria-hidden="true">
+          {FORM_STEPS.map((item, index) => (
+            <span
+              key={item.title}
+              className={`h-1 flex-1 rounded-full ${
+                index <= formStep ? "bg-teal-600" : "bg-gray-200"
+              }`}
+            />
+          ))}
+        </div>
+        <h2 className="mt-4 text-3xl font-bold text-gray-900 dark:text-white">
+          {currentStep.title}
+        </h2>
+        <p className="mt-2 text-gray-600 dark:text-gray-400">{currentStep.hint}</p>
       </div>
 
       {error && (
@@ -450,35 +480,41 @@ const RegisterPage = () => {
         </div>
       )}
 
-      <GoogleAuthButton
-        onCredential={onGoogleCredential}
-        text="signup_with"
-        disabled={isLoading}
-        label="Sign up with Google"
-      />
-      <p className="mt-3 text-xs text-center text-gray-500 dark:text-gray-400 leading-relaxed">
-        By continuing with Google, you agree to Sakora&apos;s{" "}
-        <Link to="/legal/terms" target="_blank" className="text-primary-600 hover:text-primary-500">
-          Terms
-        </Link>
-        ,{" "}
-        <Link
-          to="/legal/merchant-terms"
-          target="_blank"
-          className="text-primary-600 hover:text-primary-500"
-        >
-          Merchant Terms
-        </Link>{" "}
-        &amp;{" "}
-        <Link to="/legal/privacy" target="_blank" className="text-primary-600 hover:text-primary-500">
-          Privacy Policy
-        </Link>
-        .
-      </p>
-      <AuthDivider label="or create with email" />
+      {formStep === 0 && (
+        <>
+          <GoogleAuthButton
+            onCredential={onGoogleCredential}
+            text="signup_with"
+            disabled={isLoading}
+            label="Sign up with Google"
+          />
+          <p className="mt-3 text-xs text-center text-gray-500 dark:text-gray-400 leading-relaxed">
+            By continuing with Google, you agree to Sakora&apos;s{" "}
+            <Link to="/legal/terms" target="_blank" className="text-primary-600 hover:text-primary-500">
+              Terms
+            </Link>
+            ,{" "}
+            <Link
+              to="/legal/merchant-terms"
+              target="_blank"
+              className="text-primary-600 hover:text-primary-500"
+            >
+              Merchant Terms
+            </Link>{" "}
+            &amp;{" "}
+            <Link to="/legal/privacy" target="_blank" className="text-primary-600 hover:text-primary-500">
+              Privacy Policy
+            </Link>
+            .
+          </p>
+          <AuthDivider label="or create with email" />
+        </>
+      )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <form onSubmit={onFormSubmit} className="space-y-4">
+        <div className="space-y-4">
+          {formStep === 0 && (
+          <>
           <div>
             <label htmlFor="name" className="form-label">
               Full Name
@@ -528,7 +564,11 @@ const RegisterPage = () => {
               <p className="form-error">{errors.email.message}</p>
             )}
           </div>
+          </>
+          )}
 
+          {formStep === 1 && (
+          <>
           <div>
             <label htmlFor="phone" className="form-label">
               Phone number
@@ -580,7 +620,11 @@ const RegisterPage = () => {
               <p className="form-error">{errors.businessName.message}</p>
             )}
           </div>
+          </>
+          )}
 
+          {formStep === 2 && (
+          <>
           <div>
             <label htmlFor="password" className="form-label">
               Password
@@ -679,8 +723,33 @@ const RegisterPage = () => {
               <p className="form-error">{errors.confirmPassword.message}</p>
             )}
           </div>
+          </>
+          )}
 
-          <div className="sm:col-span-2">
+          {formStep === 3 && (
+          <>
+          <div className="space-y-2">
+            {SIGNUP_PLANS.map((plan) => (
+              <button
+                key={plan.key}
+                type="button"
+                onClick={() => setSelectedPlan(plan.key)}
+                className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left ${
+                  selectedPlan === plan.key
+                    ? "border-teal-600 bg-teal-50"
+                    : "border-gray-200 bg-white"
+                }`}
+              >
+                <span className="font-semibold text-gray-900">{plan.name}</span>
+                <span className="text-sm text-gray-500">{money(plan.price)}/mo</span>
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500">
+            You can pay for 1, 12, 24, or 48 months. A longer term costs less per month.
+          </p>
+
+          <div>
             <label htmlFor="referralCode" className="form-label">
               Referral code{" "}
               <span className="text-gray-400 font-normal">(optional)</span>
@@ -711,7 +780,6 @@ const RegisterPage = () => {
               <p className="form-error">{errors.referralCode.message}</p>
             )}
           </div>
-        </div>
 
         <div className="space-y-3 pt-1">
           <label className="flex items-start gap-3 cursor-pointer">
@@ -772,24 +840,40 @@ const RegisterPage = () => {
             </span>
           </label>
         </div>
-
-        <button
-          type="submit"
-          disabled={isLoading || isSubmitting}
-          className="btn btn-primary btn-lg w-full mobile-btn"
-        >
-          {isLoading || isSubmitting ? (
-            <div className="flex items-center justify-center">
-              <div className="spinner w-4 h-4 mr-2"></div>
-              Creating account...
-            </div>
-          ) : (
-            <div className="flex items-center justify-center">
-              <UserPlus className="w-5 h-5 mr-2" />
-              Create Account
-            </div>
+          </>
           )}
-        </button>
+        </div>
+
+        <div className="flex gap-3">
+          {formStep > 0 && (
+            <button
+              type="button"
+              onClick={() => setFormStep((value) => value - 1)}
+              className="btn btn-secondary btn-lg"
+            >
+              Back
+            </button>
+          )}
+          <button
+            type="submit"
+            disabled={isLoading || isSubmitting}
+            className="btn btn-primary btn-lg flex-1 mobile-btn"
+          >
+            {formStep < FORM_STEPS.length - 1 ? (
+              "Continue"
+            ) : isLoading || isSubmitting ? (
+              <div className="flex items-center justify-center">
+                <div className="spinner w-4 h-4 mr-2"></div>
+                Creating account...
+              </div>
+            ) : (
+              <div className="flex items-center justify-center">
+                <UserPlus className="w-5 h-5 mr-2" />
+                Create Account
+              </div>
+            )}
+          </button>
+        </div>
       </form>
 
       <div className="mt-6 text-center">

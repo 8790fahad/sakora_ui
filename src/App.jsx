@@ -163,7 +163,7 @@ function App() {
             path="/register"
             element={
               <PublicRoute>
-                <AuthLayout wide>
+                <AuthLayout>
                   <RegisterPage />
                 </AuthLayout>
               </PublicRoute>
