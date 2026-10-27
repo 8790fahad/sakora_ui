@@ -6,7 +6,20 @@ import { QueryClient, QueryClientProvider } from "react-query";
 import { Toaster } from "react-hot-toast";
 import { store, persistor } from "./store/store.js";
 import App from "./App.jsx";
+import VersionUpdate from "./components/VersionUpdate.jsx";
+import { APP_UPDATE_RETURN_KEY } from "./version.js";
 import "./index.css";
+
+const startupUrl = new URL(window.location.href);
+const returnTo = sessionStorage.getItem(APP_UPDATE_RETURN_KEY);
+if (returnTo || startupUrl.pathname.includes("/__app_update_")) {
+  sessionStorage.removeItem(APP_UPDATE_RETURN_KEY);
+  window.history.replaceState(window.history.state, "", returnTo || "/");
+} else if (startupUrl.searchParams.has("v")) {
+  startupUrl.searchParams.delete("v");
+  const next = `${startupUrl.pathname}${startupUrl.search}${startupUrl.hash}`;
+  window.history.replaceState(window.history.state, "", next);
+}
 
 // Create a client for React Query
 const queryClient = new QueryClient({
@@ -35,6 +48,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     <Provider store={store}>
       <PersistGate loading={<LoadingComponent />} persistor={persistor}>
         <QueryClientProvider client={queryClient}>
+          <VersionUpdate />
           <App />
           <Toaster
             position="top-center"
