@@ -601,9 +601,9 @@ const SalesPage = () => {
 
       {/* POS Interface */}
       {view === "pos" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* Products Grid */}
-          <div className="lg:col-span-2 space-y-4">
+          <div className="xl:col-span-2 min-w-0 space-y-4">
             {/* Scan + search (supermarket style) */}
             <form
               onSubmit={handleScanSubmit}
@@ -681,7 +681,7 @@ const SalesPage = () => {
 
             {/* Products Grid */}
             {productsLoading ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(240px,1fr))]">
                 {[...Array(8)].map((_, i) => (
                   <div key={i} className="card p-4 animate-pulse">
                     <div className="w-full h-20 bg-gray-200 rounded mb-3"></div>
@@ -701,7 +701,7 @@ const SalesPage = () => {
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(240px,1fr))]">
                 {sellableProducts.map((product) => {
                   const available = stockOnHand(product);
 
@@ -735,19 +735,19 @@ const SalesPage = () => {
 
                       {/* Product Info */}
                       <div className="space-y-1">
-                        <h4 className="font-medium text-sm text-gray-900 dark:text-white truncate">
+                        <h4 className="font-medium text-sm text-gray-900 dark:text-white leading-5 line-clamp-2 break-words">
                           {product.name}
                         </h4>
-                        <p className="text-xs text-gray-500 font-mono">
+                        <p className="text-xs text-gray-500 font-mono truncate">
                           {product.sku}
                         </p>
-                        <div className="flex items-center justify-between">
-                          <p className="font-semibold text-primary-600">
+                        <div className="flex items-center justify-between gap-2 min-w-0">
+                          <p className="font-semibold text-primary-600 truncate min-w-0">
                             {formatCurrency(product.sellingPrice)}
                           </p>
                           {product.trackInventory ? (
                             <span
-                              className={`text-xs px-2 py-1 rounded-full ${
+                              className={`shrink-0 text-xs px-2 py-1 rounded-full ${
                                 available > 10
                                   ? "bg-green-100 text-green-800"
                                   : available > 0
