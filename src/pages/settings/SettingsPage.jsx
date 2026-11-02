@@ -72,6 +72,7 @@ const SettingsPage = () => {
   const [resetConfirmText, setResetConfirmText] = useState("");
   const [profileDraft, setProfileDraft] = useState(emptyProfile);
   const [logoRemoved, setLogoRemoved] = useState(false);
+  const logoDirty = useRef(false);
   const profileDirty = useRef(false);
   const logoInputRef = useRef(null);
   const [bankDraft, setBankDraft] = useState(emptyBankDraft);
@@ -249,6 +250,7 @@ const SettingsPage = () => {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(url);
+      logoDirty.current = true;
       setProfileDraft((prev) => ({
         ...prev,
         logo: canvas.toDataURL("image/jpeg", 0.85),
@@ -366,6 +368,9 @@ const SettingsPage = () => {
   const updateBusinessMutation = useMutation(api.settings.updateBusiness, {
     onSuccess: (_data, variables) => {
       if (variables?.phones) profileDirty.current = false;
+      if (variables && Object.prototype.hasOwnProperty.call(variables, "logo")) {
+        logoDirty.current = false;
+      }
       toast.success("Business settings updated successfully");
       refetchSettings();
     },
@@ -758,7 +763,9 @@ const SettingsPage = () => {
                         website:
                           !website || /^https?:\/?\/?$/i.test(website) ? "" : website,
                       };
-                      if (!payload.logo && !logoRemoved) delete payload.logo;
+                      if (!logoDirty.current || (!payload.logo && !logoRemoved)) {
+                        delete payload.logo;
+                      }
                       updateBusinessMutation.mutate(payload);
                     }}
                   >
@@ -804,6 +811,7 @@ const SettingsPage = () => {
                           className="text-sm text-gray-500 hover:text-red-600"
                           onClick={() => {
                             profileDirty.current = true;
+                            logoDirty.current = true;
                             setLogoRemoved(true);
                             setProfileDraft((prev) => ({ ...prev, logo: "" }));
                           }}

@@ -30,6 +30,7 @@ const phonesFrom = (business) => {
 
 const BusinessDetailsPrompt = ({ business, onLater }) => {
   const logoInputRef = useRef(null);
+  const logoDirty = useRef(false);
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState({
     description: business?.description || "",
@@ -86,6 +87,7 @@ const BusinessDetailsPrompt = ({ business, onLater }) => {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(url);
+      logoDirty.current = true;
       setDraft((prev) => ({
         ...prev,
         logo: canvas.toDataURL("image/jpeg", 0.85),
@@ -100,14 +102,15 @@ const BusinessDetailsPrompt = ({ business, onLater }) => {
 
   const save = () => {
     const phones = uniquePhones(draft.phones);
-    saveMutation.mutate({
+    const payload = {
       description: draft.description.trim(),
       registrationNumber: draft.registrationNumber.trim(),
       phones,
       phone: phones[0] || "",
-      logo: draft.logo || "",
       settings: { needsProfileDetails: false },
-    });
+    };
+    if (logoDirty.current) payload.logo = draft.logo || "";
+    saveMutation.mutate(payload);
   };
 
   return (
@@ -160,7 +163,10 @@ const BusinessDetailsPrompt = ({ business, onLater }) => {
                 <button
                   type="button"
                   className="text-sm text-gray-500 hover:text-red-600"
-                  onClick={() => setDraft((prev) => ({ ...prev, logo: "" }))}
+                  onClick={() => {
+                    logoDirty.current = true;
+                    setDraft((prev) => ({ ...prev, logo: "" }));
+                  }}
                 >
                   Remove
                 </button>
