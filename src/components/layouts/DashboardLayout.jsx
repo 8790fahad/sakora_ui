@@ -239,12 +239,15 @@ const DashboardLayout = ({ children }) => {
           sidebarCollapsed ? "md:w-20" : "md:w-72"
         }`}
         style={{
-          background: "rgba(242, 242, 247, 0.8)",
+          background:
+            themeMode === "dark"
+              ? "rgba(28, 28, 30, 0.96)"
+              : "rgba(242, 242, 247, 0.8)",
           backdropFilter: "saturate(180%) blur(20px)",
           WebkitBackdropFilter: "saturate(180%) blur(20px)",
           borderRight: "0.5px solid var(--ios-separator)",
-          color: "#1c1c1e",
-          "--ios-text-primary": "#1c1c1e",
+          color: themeMode === "dark" ? "#f5f5f7" : "#1c1c1e",
+          "--ios-text-primary": themeMode === "dark" ? "#f5f5f7" : "#1c1c1e",
         }}
       >
         {/* Sidebar Header */}
@@ -266,9 +269,9 @@ const DashboardLayout = ({ children }) => {
           )}
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className={`p-2 rounded-lg hover:bg-black/5 transition-colors ${
-              sidebarCollapsed ? "mx-auto" : "ml-auto"
-            }`}
+            className={`p-2 rounded-lg transition-colors ${
+              themeMode === "dark" ? "hover:bg-white/10" : "hover:bg-black/5"
+            } ${sidebarCollapsed ? "mx-auto" : "ml-auto"}`}
           >
             {sidebarCollapsed ? (
               <PanelLeft className="w-5 h-5 text-[var(--ios-gray-1)]" />
@@ -298,7 +301,9 @@ const DashboardLayout = ({ children }) => {
                   } ${
                     active
                       ? "bg-[var(--ios-blue)] text-white shadow-sm"
-                      : "text-[var(--ios-text-primary)] hover:bg-black/5"
+                      : `text-[var(--ios-text-primary)] ${
+                          themeMode === "dark" ? "hover:bg-white/10" : "hover:bg-black/5"
+                        }`
                   }`}
                   title={sidebarCollapsed ? item.name : undefined}
                 >
@@ -334,53 +339,6 @@ const DashboardLayout = ({ children }) => {
           </div>
         </nav>
 
-        <div className="px-3 pb-3">
-          {sidebarCollapsed ? (
-            <button
-              type="button"
-              onClick={() => chooseTheme(themeMode === "dark" ? "light" : "dark")}
-              className="mx-auto flex p-2 rounded-lg hover:bg-black/5"
-              title={themeMode === "dark" ? "Dark mode" : "Light mode"}
-            >
-              {themeMode === "dark" ? (
-                <Moon className="w-5 h-5 text-[#1c1c1e]" />
-              ) : (
-                <Sun className="w-5 h-5 text-[#1c1c1e]" />
-              )}
-            </button>
-          ) : (
-            <>
-              <p className="px-3 pb-2 text-[13px] text-[var(--ios-gray-1)]">Mode</p>
-              <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-white">
-                <button
-                  type="button"
-                  onClick={() => chooseTheme("light")}
-                  className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-[14px] font-medium ${
-                    themeMode === "light"
-                      ? "bg-teal-700 text-white"
-                      : "text-[#1c1c1e]"
-                  }`}
-                >
-                  <Sun className="w-4 h-4" />
-                  Light
-                </button>
-                <button
-                  type="button"
-                  onClick={() => chooseTheme("dark")}
-                  className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-[14px] font-medium ${
-                    themeMode === "dark"
-                      ? "bg-teal-700 text-white"
-                      : "text-[#1c1c1e]"
-                  }`}
-                >
-                  <Moon className="w-4 h-4" />
-                  Dark
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-
         {/* Sidebar User Section */}
         <div
           className="p-3 border-t"
@@ -403,7 +361,9 @@ const DashboardLayout = ({ children }) => {
                 className={`p-2 rounded-lg transition-colors ${
                   isActive("/settings")
                     ? "bg-[var(--ios-blue)] text-white"
-                    : "text-[var(--ios-gray-1)] hover:bg-black/5 hover:text-[var(--ios-blue)]"
+                    : `text-[var(--ios-gray-1)] hover:text-[var(--ios-blue)] ${
+                        themeMode === "dark" ? "hover:bg-white/10" : "hover:bg-black/5"
+                      }`
                 }`}
                 title="Settings"
               >
@@ -425,7 +385,9 @@ const DashboardLayout = ({ children }) => {
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
                   isActive("/settings")
                     ? "bg-[var(--ios-blue)] text-white shadow-sm"
-                    : "text-[var(--ios-text-primary)] hover:bg-black/5"
+                    : `text-[var(--ios-text-primary)] ${
+                        themeMode === "dark" ? "hover:bg-white/10" : "hover:bg-black/5"
+                      }`
                 }`}
               >
                 <div
@@ -445,7 +407,11 @@ const DashboardLayout = ({ children }) => {
                 </div>
                 <span className="text-[15px] font-medium">Settings</span>
               </Link>
-              <div className="flex items-center p-2 rounded-xl hover:bg-black/5 transition-colors">
+              <div
+                className={`flex items-center p-2 rounded-xl transition-colors ${
+                  themeMode === "dark" ? "hover:bg-white/10" : "hover:bg-black/5"
+                }`}
+              >
                 <Link
                   to="/profile"
                   className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--ios-blue)] to-[var(--ios-purple)] flex items-center justify-center flex-shrink-0"
@@ -486,12 +452,15 @@ const DashboardLayout = ({ children }) => {
         <header
           className="sticky top-0 z-40 md:relative"
           style={{
-            background: "rgba(249, 249, 249, 0.94)",
+            background:
+              themeMode === "dark"
+                ? "rgba(28, 28, 30, 0.96)"
+                : "rgba(249, 249, 249, 0.94)",
             backdropFilter: "saturate(180%) blur(20px)",
             WebkitBackdropFilter: "saturate(180%) blur(20px)",
             borderBottom: "0.5px solid var(--ios-separator)",
-            color: "#1c1c1e",
-            "--ios-text-primary": "#1c1c1e",
+            color: themeMode === "dark" ? "#f5f5f7" : "#1c1c1e",
+            "--ios-text-primary": themeMode === "dark" ? "#f5f5f7" : "#1c1c1e",
           }}
         >
           <div className="flex items-center justify-between h-14 px-4">
@@ -514,12 +483,25 @@ const DashboardLayout = ({ children }) => {
             </h1>
 
             {/* Right Buttons */}
-            <div className="w-24 flex justify-end items-center gap-1 md:w-auto">
+            <div className="flex justify-end items-center gap-1 md:w-auto">
               <button
                 onClick={() => setShowSearch(!showSearch)}
                 className="p-2.5 rounded-full text-[var(--ios-blue)] hover:bg-[var(--ios-blue)]/10 transition-colors"
               >
                 <Search className="w-5 h-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => chooseTheme(themeMode === "dark" ? "light" : "dark")}
+                className="p-2.5 rounded-full text-[var(--ios-blue)] hover:bg-[var(--ios-blue)]/10 transition-colors"
+                title={themeMode === "dark" ? "Switch to light" : "Switch to dark"}
+                aria-label={themeMode === "dark" ? "Switch to light" : "Switch to dark"}
+              >
+                {themeMode === "dark" ? (
+                  <Sun className="w-5 h-5" />
+                ) : (
+                  <Moon className="w-5 h-5" />
+                )}
               </button>
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
@@ -621,15 +603,18 @@ const DashboardLayout = ({ children }) => {
       {/* ==================== MOBILE TAB BAR (md and below) ==================== */}
       <nav
         className="fixed bottom-0 left-0 right-0 z-50 block md:hidden"
-        style={{
-          background: "rgba(249, 249, 249, 0.94)",
+          style={{
+          background:
+            themeMode === "dark"
+              ? "rgba(28, 28, 30, 0.96)"
+              : "rgba(249, 249, 249, 0.94)",
           backdropFilter: "saturate(180%) blur(20px)",
           WebkitBackdropFilter: "saturate(180%) blur(20px)",
           borderTop: "0.5px solid var(--ios-separator)",
           paddingBottom: "env(safe-area-inset-bottom)",
           height: "var(--tab-bar-height)",
-          color: "#1c1c1e",
-          "--ios-text-primary": "#1c1c1e",
+          color: themeMode === "dark" ? "#f5f5f7" : "#1c1c1e",
+          "--ios-text-primary": themeMode === "dark" ? "#f5f5f7" : "#1c1c1e",
         }}
       >
         <div className="flex items-center justify-around h-[calc(var(--tab-bar-height)-env(safe-area-inset-bottom))]">
@@ -699,32 +684,6 @@ const DashboardLayout = ({ children }) => {
                   </div>
                   <ChevronRight className="w-5 h-5 text-[var(--ios-gray-3)]" />
                 </Link>
-              </div>
-            </div>
-
-            <div className="ios-section">
-              <p className="ios-section-header">Mode</p>
-              <div className="mx-4 grid grid-cols-2 gap-1 p-1 rounded-xl bg-white">
-                <button
-                  type="button"
-                  onClick={() => chooseTheme("light")}
-                  className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-[15px] font-medium ${
-                    themeMode === "light" ? "bg-teal-700 text-white" : "text-[#1c1c1e]"
-                  }`}
-                >
-                  <Sun className="w-4 h-4" />
-                  Light
-                </button>
-                <button
-                  type="button"
-                  onClick={() => chooseTheme("dark")}
-                  className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-[15px] font-medium ${
-                    themeMode === "dark" ? "bg-teal-700 text-white" : "text-[#1c1c1e]"
-                  }`}
-                >
-                  <Moon className="w-4 h-4" />
-                  Dark
-                </button>
               </div>
             </div>
 

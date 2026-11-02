@@ -69,11 +69,11 @@ const formatMoneyInput = (value) => {
 };
 
 const formatCountInput = (value) => {
-  const digits = String(value ?? "")
-    .replace(/\D/g, "")
-    .replace(/^0+(?=\d)/, "");
-  if (!digits) return "";
-  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const raw = String(value ?? "").replace(/,/g, "").trim();
+  if (!raw) return "";
+  const whole = raw.split(".")[0].replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+  if (!whole) return "0";
+  return whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 };
 
 const parseAmount = (value) => {

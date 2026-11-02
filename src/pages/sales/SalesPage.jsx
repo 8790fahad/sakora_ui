@@ -598,10 +598,10 @@ const SalesPage = () => {
               onSubmit={handleScanSubmit}
               className="flex flex-col sm:flex-row gap-2"
             >
-              <div className="flex items-stretch rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 overflow-hidden focus-within:ring-2 focus-within:ring-primary-500 focus-within:border-primary-500">
+              <div className="flex items-stretch rounded-lg border border-gray-300 bg-white overflow-hidden focus-within:ring-2 focus-within:ring-primary-500 focus-within:border-primary-500">
                 <label
                   htmlFor="pos-qty"
-                  className="flex items-center px-3 text-xs font-semibold text-gray-500 bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700"
+                  className="flex items-center px-3 text-xs font-semibold text-gray-500 bg-gray-50 border-r border-gray-200"
                 >
                   Qty
                 </label>
@@ -612,7 +612,8 @@ const SalesPage = () => {
                   min="0.001"
                   step="any"
                   inputMode="decimal"
-                  className="w-20 sm:w-24 px-2 py-2.5 text-center text-lg font-semibold bg-transparent border-0 focus:ring-0 outline-none text-gray-900 dark:text-white"
+                  className="w-20 sm:w-24 px-2 py-2.5 text-center text-lg font-semibold bg-white border-0 focus:ring-0 outline-none"
+                  style={{ color: "#1c1c1e", WebkitTextFillColor: "#1c1c1e", caretColor: "#0d9488" }}
                   value={scanQty}
                   onChange={(e) => setScanQty(e.target.value)}
                   onFocus={(e) => e.target.select()}
@@ -709,7 +710,7 @@ const SalesPage = () => {
                           focusScanInput();
                         }
                       }}
-                      className={`card p-3 cursor-pointer transition-all hover:shadow-md mobile-btn ${
+                      className={`card relative p-3 cursor-pointer transition-all hover:shadow-md mobile-btn ${
                         isOutOfStock
                           ? "opacity-50 cursor-not-allowed"
                           : "hover:bg-primary-50"
