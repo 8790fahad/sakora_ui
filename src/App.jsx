@@ -17,6 +17,7 @@ import {
   setTokenFromStorage,
 } from "./store/slices/authSlice";
 import { setTheme } from "./store/slices/uiSlice";
+import { applyTheme, readTheme } from "./utils/theme";
 
 const LoginPage = lazy(() => import("./pages/auth/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/auth/RegisterPage"));
@@ -74,45 +75,10 @@ function App() {
       }
     }
 
-    // Apply theme
-    const storedTheme = localStorage.getItem("sakora_theme");
-    if (storedTheme) {
-      dispatch(setTheme(storedTheme));
-      applyTheme(storedTheme);
-    } else {
-      // Auto-detect system theme
-      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
-        .matches
-        ? "dark"
-        : "light";
-      dispatch(setTheme(systemTheme));
-      applyTheme(systemTheme);
-    }
-
-    // Listen for system theme changes
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const handleThemeChange = (e) => {
-      const currentTheme = localStorage.getItem("sakora_theme");
-      if (currentTheme === "system") {
-        const newTheme = e.matches ? "dark" : "light";
-        applyTheme(newTheme);
-      }
-    };
-    mediaQuery.addEventListener("change", handleThemeChange);
-
-    return () => {
-      mediaQuery.removeEventListener("change", handleThemeChange);
-    };
+    const theme = readTheme();
+    dispatch(setTheme(theme));
+    applyTheme(theme);
   }, [dispatch]);
-
-  // Apply theme to document
-  const applyTheme = (theme) => {
-    if (theme === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  };
 
   // Protected route wrapper
   const ProtectedRoute = ({ children }) => {

@@ -725,7 +725,7 @@ const ProductsPage = () => {
                 stockFilter === btn.key ||
                 (btn.key === "reorder" && stockFilter === "low")
                   ? "bg-teal-600 text-white"
-                  : "bg-[var(--ios-gray-5)] text-[var(--ios-text-primary)]"
+                  : "bg-[var(--ios-gray-5)] text-[#1c1c1e]"
               }`}
             >
               {btn.label}
@@ -741,7 +741,7 @@ const ProductsPage = () => {
             className={`ios-btn-sm whitespace-nowrap ${
               !categoryFilter
                 ? "bg-[var(--ios-blue)] text-white"
-                : "bg-[var(--ios-gray-5)] text-[var(--ios-text-primary)]"
+                : "bg-[var(--ios-gray-5)] text-[#1c1c1e]"
             }`}
           >
             All categories
@@ -753,7 +753,7 @@ const ProductsPage = () => {
               className={`ios-btn-sm whitespace-nowrap ${
                 categoryFilter === cat.id
                   ? "bg-[var(--ios-blue)] text-white"
-                  : "bg-[var(--ios-gray-5)] text-[var(--ios-text-primary)]"
+                  : "bg-[var(--ios-gray-5)] text-[#1c1c1e]"
               }`}
             >
               {cat.name}
@@ -867,7 +867,7 @@ const ProductsPage = () => {
                   >
                     <div className="flex-1 min-w-0 py-2">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-[17px] font-medium truncate pr-2">
+                        <p className="text-[17px] font-medium text-[#1c1c1e] truncate min-w-0 flex-1 pr-2">
                           {product.name}
                         </p>
                         <div className="flex items-center gap-1 flex-shrink-0">
@@ -1452,30 +1452,28 @@ const ProductsPage = () => {
                         {...register("expiryDate")}
                       />
                     </div>
-                    {!selectedProduct && (
-                      <div className="ios-input-wrapper">
-                        <label className="ios-input-label">Initial Stock</label>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          className="ios-input"
-                          placeholder="0"
-                          value={formatCountInput(watch("initialStock"))}
-                          onChange={(e) =>
-                            setValue("initialStock", formatCountInput(e.target.value), {
-                              shouldDirty: true,
-                            })
-                          }
-                        />
-                      </div>
-                    )}
+                    <div className="ios-input-wrapper">
+                      <label className="ios-input-label">Quantity</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        className="ios-input"
+                        placeholder="0"
+                        value={formatCountInput(watch("initialStock"))}
+                        onChange={(e) =>
+                          setValue("initialStock", formatCountInput(e.target.value), {
+                            shouldDirty: true,
+                          })
+                        }
+                      />
+                    </div>
                       </>
                     )}
                   </div>
                   <p className="ios-section-footer">
                     {itemKind === "service"
                       ? "Services are sold without reducing stock."
-                      : `Alert when stock hits reorder level, or when expiry is within ${expiryAlertDays} days.`}
+                      : `Quantity is the opening balance on hand. Alert when stock hits reorder level, or when expiry is within ${expiryAlertDays} days.`}
                   </p>
                 </div>
 

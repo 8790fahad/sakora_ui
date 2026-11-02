@@ -33,6 +33,7 @@ import { useSelector } from "react-redux";
 import { toast } from "react-hot-toast";
 import { Link } from "react-router-dom";
 import api from "../../services/api";
+import { applyTheme } from "../../utils/theme";
 import { selectUser } from "../../store/slices/authSlice";
 import {
   PAPER_FORMATS,
@@ -1814,7 +1815,7 @@ const SettingsPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Theme
+                      Mode
                     </label>
                     <div className="flex space-x-4">
                       <button
@@ -1823,9 +1824,10 @@ const SettingsPage = () => {
                             ? "border-primary-500 bg-primary-50 text-primary-700"
                             : "border-gray-300 bg-white text-gray-700"
                         }`}
-                        onClick={() =>
-                          handlePreferenceChange("display", "theme", "light")
-                        }
+                        onClick={() => {
+                          applyTheme("light");
+                          handlePreferenceChange("display", "theme", "light");
+                        }}
                       >
                         <Sun className="w-4 h-4" />
                         <span>Light</span>
@@ -1836,9 +1838,10 @@ const SettingsPage = () => {
                             ? "border-primary-500 bg-primary-50 text-primary-700"
                             : "border-gray-300 bg-white text-gray-700"
                         }`}
-                        onClick={() =>
-                          handlePreferenceChange("display", "theme", "dark")
-                        }
+                        onClick={() => {
+                          applyTheme("dark");
+                          handlePreferenceChange("display", "theme", "dark");
+                        }}
                       >
                         <Moon className="w-4 h-4" />
                         <span>Dark</span>

@@ -567,7 +567,7 @@ const SalesPage = () => {
               className={`px-4 py-2 rounded-l-lg text-sm font-medium transition-colors ${
                 view === "pos"
                   ? "bg-primary-100 text-primary-600 border-primary-300"
-                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
               }`}
             >
               <ShoppingCart className="w-4 h-4 mr-2 inline" />
@@ -578,7 +578,7 @@ const SalesPage = () => {
               className={`px-4 py-2 rounded-r-lg text-sm font-medium transition-colors ${
                 view === "history"
                   ? "bg-primary-100 text-primary-600 border-primary-300"
-                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
               }`}
             >
               <Receipt className="w-4 h-4 mr-2 inline" />
@@ -612,7 +612,7 @@ const SalesPage = () => {
                   min="0.001"
                   step="any"
                   inputMode="decimal"
-                  className="w-20 sm:w-24 px-2 py-2.5 text-center text-lg font-semibold bg-transparent border-0 focus:ring-0 outline-none"
+                  className="w-20 sm:w-24 px-2 py-2.5 text-center text-lg font-semibold bg-transparent border-0 focus:ring-0 outline-none text-gray-900 dark:text-white"
                   value={scanQty}
                   onChange={(e) => setScanQty(e.target.value)}
                   onFocus={(e) => e.target.select()}
@@ -662,7 +662,7 @@ const SalesPage = () => {
                 </button>
               </div>
             </form>
-            <p className="text-xs text-gray-500 -mt-2">
+            <p className="text-xs text-gray-500 dark:text-gray-300 -mt-2">
               Tip: set Qty then scan, or type{" "}
               <span className="font-mono">3*barcode</span> and press Enter.
             </p>
@@ -677,6 +677,16 @@ const SalesPage = () => {
                     <div className="h-3 bg-gray-200 rounded"></div>
                   </div>
                 ))}
+              </div>
+            ) : products.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-600 px-6 py-16 text-center">
+                <ShoppingCart className="w-10 h-10 mx-auto text-gray-400 mb-3" />
+                <p className="text-base font-medium text-gray-900 dark:text-white">
+                  {search ? "No products match that search" : "No products to sell"}
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  Products you add show up here.
+                </p>
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -706,7 +716,7 @@ const SalesPage = () => {
                       }`}
                     >
                       {/* Product Image */}
-                      <div className="w-full h-16 bg-gray-100 rounded mb-2 flex items-center justify-center">
+                      <div className="w-full h-16 bg-gray-100 dark:bg-gray-700 rounded mb-2 flex items-center justify-center">
                         {product.image ? (
                           <img
                             src={productImageSrc(product.image, "sale")}

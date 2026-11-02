@@ -29,9 +29,13 @@ import {
   LifeBuoy,
   Gift,
   FileText,
+  Sun,
+  Moon,
 } from "lucide-react";
 
 import { selectUser, logoutUser } from "../../store/slices/authSlice";
+import { setTheme } from "../../store/slices/uiSlice";
+import { applyTheme, readTheme } from "../../utils/theme";
 import api from "../../services/api";
 import { applyBrandColors } from "../../utils/brandImage";
 import BusinessDetailsPrompt from "../business/BusinessDetailsPrompt";
@@ -59,6 +63,7 @@ const DashboardLayout = ({ children }) => {
   const [remoteNotes, setRemoteNotes] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [hideProfilePrompt, setHideProfilePrompt] = useState(false);
+  const [themeMode, setThemeMode] = useState(readTheme);
   const [dismissedGuidePath, setDismissedGuidePath] = useState("");
   const { data: billingData, isError: planError } = useQuery(
     "billing-plans",
@@ -204,6 +209,15 @@ const DashboardLayout = ({ children }) => {
     dispatch(logoutUser());
   };
 
+  const chooseTheme = (next) => {
+    const mode = applyTheme(next);
+    setThemeMode(mode);
+    dispatch(setTheme(mode));
+    api.settings
+      .updatePreferences({ preferences: { display: { theme: mode } } })
+      .catch(() => {});
+  };
+
   const isActive = (href) => {
     if (href === "/dashboard") return location.pathname === "/dashboard";
     return location.pathname.startsWith(href);
@@ -229,6 +243,8 @@ const DashboardLayout = ({ children }) => {
           backdropFilter: "saturate(180%) blur(20px)",
           WebkitBackdropFilter: "saturate(180%) blur(20px)",
           borderRight: "0.5px solid var(--ios-separator)",
+          color: "#1c1c1e",
+          "--ios-text-primary": "#1c1c1e",
         }}
       >
         {/* Sidebar Header */}
@@ -317,6 +333,53 @@ const DashboardLayout = ({ children }) => {
             })}
           </div>
         </nav>
+
+        <div className="px-3 pb-3">
+          {sidebarCollapsed ? (
+            <button
+              type="button"
+              onClick={() => chooseTheme(themeMode === "dark" ? "light" : "dark")}
+              className="mx-auto flex p-2 rounded-lg hover:bg-black/5"
+              title={themeMode === "dark" ? "Dark mode" : "Light mode"}
+            >
+              {themeMode === "dark" ? (
+                <Moon className="w-5 h-5 text-[#1c1c1e]" />
+              ) : (
+                <Sun className="w-5 h-5 text-[#1c1c1e]" />
+              )}
+            </button>
+          ) : (
+            <>
+              <p className="px-3 pb-2 text-[13px] text-[var(--ios-gray-1)]">Mode</p>
+              <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-white">
+                <button
+                  type="button"
+                  onClick={() => chooseTheme("light")}
+                  className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-[14px] font-medium ${
+                    themeMode === "light"
+                      ? "bg-teal-700 text-white"
+                      : "text-[#1c1c1e]"
+                  }`}
+                >
+                  <Sun className="w-4 h-4" />
+                  Light
+                </button>
+                <button
+                  type="button"
+                  onClick={() => chooseTheme("dark")}
+                  className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-[14px] font-medium ${
+                    themeMode === "dark"
+                      ? "bg-teal-700 text-white"
+                      : "text-[#1c1c1e]"
+                  }`}
+                >
+                  <Moon className="w-4 h-4" />
+                  Dark
+                </button>
+              </div>
+            </>
+          )}
+        </div>
 
         {/* Sidebar User Section */}
         <div
@@ -427,6 +490,8 @@ const DashboardLayout = ({ children }) => {
             backdropFilter: "saturate(180%) blur(20px)",
             WebkitBackdropFilter: "saturate(180%) blur(20px)",
             borderBottom: "0.5px solid var(--ios-separator)",
+            color: "#1c1c1e",
+            "--ios-text-primary": "#1c1c1e",
           }}
         >
           <div className="flex items-center justify-between h-14 px-4">
@@ -563,6 +628,8 @@ const DashboardLayout = ({ children }) => {
           borderTop: "0.5px solid var(--ios-separator)",
           paddingBottom: "env(safe-area-inset-bottom)",
           height: "var(--tab-bar-height)",
+          color: "#1c1c1e",
+          "--ios-text-primary": "#1c1c1e",
         }}
       >
         <div className="flex items-center justify-around h-[calc(var(--tab-bar-height)-env(safe-area-inset-bottom))]">
@@ -632,6 +699,32 @@ const DashboardLayout = ({ children }) => {
                   </div>
                   <ChevronRight className="w-5 h-5 text-[var(--ios-gray-3)]" />
                 </Link>
+              </div>
+            </div>
+
+            <div className="ios-section">
+              <p className="ios-section-header">Mode</p>
+              <div className="mx-4 grid grid-cols-2 gap-1 p-1 rounded-xl bg-white">
+                <button
+                  type="button"
+                  onClick={() => chooseTheme("light")}
+                  className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-[15px] font-medium ${
+                    themeMode === "light" ? "bg-teal-700 text-white" : "text-[#1c1c1e]"
+                  }`}
+                >
+                  <Sun className="w-4 h-4" />
+                  Light
+                </button>
+                <button
+                  type="button"
+                  onClick={() => chooseTheme("dark")}
+                  className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-[15px] font-medium ${
+                    themeMode === "dark" ? "bg-teal-700 text-white" : "text-[#1c1c1e]"
+                  }`}
+                >
+                  <Moon className="w-4 h-4" />
+                  Dark
+                </button>
               </div>
             </div>
 
