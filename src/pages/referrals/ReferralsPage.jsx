@@ -111,7 +111,7 @@ const ReferralsPage = () => {
   return (
     <div className="p-4 md:p-8 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Referrals</h1>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Referrals</h1>
         <p className="text-slate-500 mt-1">
           Invite other businesses and earn{" "}
           <strong>{program.commissionRate ?? 20}%</strong> commission when they

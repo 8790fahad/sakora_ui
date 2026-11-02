@@ -103,11 +103,17 @@
   color: #1c1c1e;
 }
 
-/* Sales and history cards sit on the dark page, so they need a lighter panel. */
+/* White panels stay white in dark mode. Text written on them must stay dark,
+   including Team, Dashboard, Orders, Invoices, and Sales cards. */
+.dark .bg-white:not([class*="dark:bg-"]),
 .dark .card {
-  background-color: #2c2c2e;
-  color: #f5f5f7;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #1c1c1e;
+  --ios-text-primary: #1c1c1e;
+}
+
+.dark .bg-white:not([class*="dark:bg-"]) .dark\:text-white,
+.dark .card .dark\:text-white {
+  color: #1c1c1e;
 }
 
 @layer base {

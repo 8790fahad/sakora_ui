@@ -125,7 +125,7 @@ const VatPage = () => {
     <div className="px-4 py-6 sm:px-6 lg:px-8 space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">VAT</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">VAT</h1>
           <p className="text-sm text-gray-500">
             {setup.name || "VAT"} {setup.enabled ? `at ${setup.rate}%` : "is off"}
             {setup.tin ? ` · TIN ${setup.tin}` : ""}

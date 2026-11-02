@@ -210,6 +210,17 @@ const SalesPage = () => {
   );
 
   const products = productsData?.data?.items || [];
+  const stockOnHand = (product) => {
+    const inventory = product.inventory?.[0];
+    if (!inventory) return 0;
+    return (
+      parseFloat(inventory.quantity || 0) -
+      parseFloat(inventory.reservedQuantity || 0)
+    );
+  };
+  const sellableProducts = products.filter(
+    (product) => !product.trackInventory || stockOnHand(product) > 0
+  );
   const customers = customersData?.data?.items || [];
   const sales = salesData?.data?.items || [];
 
@@ -679,7 +690,7 @@ const SalesPage = () => {
                   </div>
                 ))}
               </div>
-            ) : products.length === 0 ? (
+            ) : sellableProducts.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-600 px-6 py-16 text-center">
                 <ShoppingCart className="w-10 h-10 mx-auto text-gray-400 mb-3" />
                 <p className="text-base font-medium text-gray-900 dark:text-white">
@@ -691,30 +702,20 @@ const SalesPage = () => {
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                {products.map((product) => {
-                  const inventory = product.inventory?.[0];
-                  const available = inventory
-                    ? parseFloat(inventory.quantity || 0) -
-                      parseFloat(inventory.reservedQuantity || 0)
-                    : 0;
-                  const isOutOfStock = product.trackInventory && available <= 0;
+                {sellableProducts.map((product) => {
+                  const available = stockOnHand(product);
 
                   return (
                     <div
                       key={product.id}
                       onClick={() => {
-                        if (isOutOfStock) return;
                         const qty = Math.max(0.001, parseFloat(scanQty) || 1);
                         if (addToCart(product, qty)) {
                           setScanQty("1");
                           focusScanInput();
                         }
                       }}
-                      className={`card relative p-3 cursor-pointer transition-all hover:shadow-md mobile-btn ${
-                        isOutOfStock
-                          ? "opacity-50 cursor-not-allowed"
-                          : "hover:bg-primary-50"
-                      }`}
+                      className="card relative p-3 cursor-pointer transition-all hover:shadow-md mobile-btn hover:bg-primary-50"
                     >
                       {/* Product Image */}
                       <div className="w-full h-16 bg-gray-100 dark:bg-gray-700 rounded mb-2 flex items-center justify-center">
@@ -763,14 +764,6 @@ const SalesPage = () => {
                           )}
                         </div>
                       </div>
-
-                      {isOutOfStock && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-red-50 bg-opacity-90 rounded">
-                          <span className="text-xs font-medium text-red-600">
-                            Out of Stock
-                          </span>
-                        </div>
-                      )}
                     </div>
                   );
                 })}
